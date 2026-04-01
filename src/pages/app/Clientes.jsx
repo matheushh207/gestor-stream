@@ -171,6 +171,31 @@ export default function Clientes() {
     return out
   }, [list])
 
+  function renderVencimento(c) {
+    if (!c.vencimento) return <span className="text-gray-500">—</span>;
+    const dias = diasAteVencimento(c.vencimento);
+    const dateStr = new Date(c.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    if (dias === null) return <span className="text-gray-500">{dateStr}</span>;
+    
+    let badge = null;
+    if (dias < 0) {
+      badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-red-500/20 text-red-400">Vencido</span>;
+    } else if (dias === 0) {
+      badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-400">Hj</span>;
+    } else if (dias <= 3) {
+      badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-400">{dias} dias</span>;
+    } else {
+      badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400">{dias} dias</span>;
+    }
+    
+    return (
+      <div className="flex items-center">
+        <span>{dateStr}</span>
+        {badge}
+      </div>
+    );
+  }
+
   return (
     <>
       <Header
@@ -335,20 +360,20 @@ export default function Clientes() {
                     return (
                       <tr
                         key={c.id}
-                        className={`border-b border-gray-800 ${rowAlertClass(c.vencimento)}`}
+                        className={`border-b border-gray-800 transition-colors hover:bg-gray-800/40 ${rowAlertClass(c.vencimento)}`}
                       >
-                        <td className="py-2 pr-2 text-white">{c.nome}</td>
-                        <td className="py-2 pr-2 text-gray-400">
-                          {c.vencimento || '—'}
+                        <td className="py-3 pr-2 font-medium text-white">{c.nome}</td>
+                        <td className="py-3 pr-2 text-gray-400 whitespace-nowrap">
+                          {renderVencimento(c)}
                         </td>
-                        <td className="py-2 pr-2">
+                        <td className="py-3 pr-2">
                           <span
-                            className={`rounded px-2 py-0.5 text-xs ${statusColors[derived] || statusColors.ativo}`}
+                            className={`rounded px-2 flex w-max py-0.5 text-xs font-semibold uppercase ${statusColors[derived] || statusColors.ativo}`}
                           >
                             {derived}
                           </span>
                         </td>
-                        <td className="py-2">
+                        <td className="py-3">
                           <button
                             type="button"
                             onClick={() => openEdit(c)}
