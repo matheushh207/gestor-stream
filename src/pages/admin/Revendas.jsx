@@ -13,7 +13,7 @@ export default function AdminRevendas() {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
-  const [vencimento, setVencimento] = useState('')
+  const [dataCriacao, setDataCriacao] = useState(new Date().toISOString().split('T')[0])
   const [status, setStatus] = useState('ativo')
   const [saving, setSaving] = useState(false)
   const [linkRevendaId, setLinkRevendaId] = useState('')
@@ -59,11 +59,19 @@ export default function AdminRevendas() {
       return
     }
 
+    // Calcula Vencimento
+    let finalVencimento = null;
+    if (dataCriacao) {
+      const d = new Date(dataCriacao);
+      d.setUTCDate(d.getUTCDate() + 30);
+      finalVencimento = d.toISOString().split('T')[0];
+    }
+
     // 2. Salvar Revenda no Banco
     const { data: revendaData, error: revendaErr } = await supabase.from('revendas').insert({
       nome: nome.trim(),
       email: email.trim(),
-      vencimento: vencimento || null,
+      vencimento: finalVencimento,
       status,
     }).select().single()
 
@@ -88,7 +96,7 @@ export default function AdminRevendas() {
     setNome('')
     setEmail('')
     setSenha('')
-    setVencimento('')
+    setDataCriacao(new Date().toISOString().split('T')[0])
     setStatus('ativo')
     alert('Revenda criada e login gerado com sucesso!')
     load()
@@ -205,14 +213,15 @@ export default function AdminRevendas() {
               onChange={(e) => setSenha(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
             />
-            <label className="text-xs text-gray-500">Data de Vencimento</label>
+            <label className="text-xs text-gray-400 font-semibold mb-1 block">Acesso liberado do dia</label>
             <input
               type="date"
-              value={vencimento}
-              onChange={(e) => setVencimento(e.target.value)}
+              value={dataCriacao}
+              onChange={(e) => setDataCriacao(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
             />
-            <label className="text-xs text-gray-500 mt-2 block">Status Inicial</label>
+            <p className="text-[10px] text-gray-500 mt-0 mb-3">(O sistema somará 30 dias automaticamente para o vencimento da revenda)</p>
+            <label className="text-xs text-gray-500 block">Status Inicial</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
