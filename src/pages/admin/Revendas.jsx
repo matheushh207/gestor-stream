@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import Header from '../../components/Header'
 import Card from '../../components/Card'
 
@@ -10,6 +11,7 @@ export default function AdminRevendas() {
   const [loading, setLoading] = useState(true)
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
+  const [senha, setSenha] = useState('')
   const [status, setStatus] = useState('ativo')
   const [saving, setSaving] = useState(false)
   const [linkRevendaId, setLinkRevendaId] = useState('')
@@ -31,20 +33,60 @@ export default function AdminRevendas() {
 
   async function handleCreate(e) {
     e.preventDefault()
+    if (!senha || senha.length < 6) {
+      alert('A senha deve ter no mínimo 6 caracteres.')
+      return
+    }
     setSaving(true)
-    const { error } = await supabase.from('revendas').insert({
+
+    // 1. Criar usuário no Auth (sem deslogar o Admin)
+    const url = import.meta.env.VITE_SUPABASE_URL || 'https://qghdhewbssfatxmhnwng.supabase.co'
+    const key = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_sAzqFHv2ZeeLZNVjc0BGAQ_-X-kDWn3'
+    const adminAuthClient = createClient(url, key, { 
+      auth: { autoRefreshToken: false, persistSession: false } 
+    })
+
+    const { data: authData, error: authErr } = await adminAuthClient.auth.signUp({
+      email: email.trim(),
+      password: senha
+    })
+
+    if (authErr) {
+      setSaving(false)
+      alert('Erro ao criar login: ' + authErr.message)
+      return
+    }
+
+    // 2. Salvar Revenda no Banco
+    const { data: revendaData, error: revendaErr } = await supabase.from('revendas').insert({
       nome: nome.trim(),
       email: email.trim(),
       status,
-    })
-    setSaving(false)
-    if (error) {
-      alert(error.message)
+    }).select().single()
+
+    if (revendaErr) {
+      setSaving(false)
+      alert(revendaErr.message)
       return
     }
+
+    // 3. Vincular usuário recém-criado à revenda
+    const { error: linkErr } = await supabase.rpc('admin_link_revenda_user', {
+      p_revenda_id: revendaData.id,
+      p_email: email.trim(),
+    })
+    
+    setSaving(false)
+    if (linkErr) {
+      alert('Erro ao vincular permissões: ' + linkErr.message)
+      return
+    }
+
     setNome('')
     setEmail('')
+    setSenha('')
     setStatus('ativo')
+    alert('Revenda criada e login gerado com sucesso!')
     load()
   }
 
@@ -99,6 +141,15 @@ export default function AdminRevendas() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            />
+            <input
+              type="text"
+              placeholder="Senha para a revenda acessar"
+              required
+              minLength={6}
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
             />
             <select

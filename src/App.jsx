@@ -9,6 +9,7 @@ import AdminRevendas from './pages/admin/Revendas'
 import AppDashboard from './pages/app/Dashboard'
 import Clientes from './pages/app/Clientes'
 import Financeiro from './pages/app/Financeiro'
+import Configuracoes from './pages/app/Configuracoes'
 
 function GuestRoute({ children }) {
   const [state, setState] = useState({ loading: true, role: null })
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/app/dashboard" element={<AppDashboard />} />
         <Route path="/app/clientes" element={<Clientes />} />
         <Route path="/app/financeiro" element={<Financeiro />} />
+        <Route path="/app/configuracoes" element={<Configuracoes />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/login" replace />} />

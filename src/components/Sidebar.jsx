@@ -16,6 +16,7 @@ export default function Sidebar({ role }) {
     { to: '/app/dashboard', label: 'Dashboard' },
     { to: '/app/clientes', label: 'Clientes' },
     { to: '/app/financeiro', label: 'Financeiro' },
+    { to: '/app/configuracoes', label: 'Configurações' },
   ]
   const links = role === 'admin' ? adminLinks : revendaLinks
   const badge = role === 'admin' ? 'Admin' : 'Revenda'
