@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { createClient } from '@supabase/supabase-js'
 import Header from '../../components/Header'
 import Card from '../../components/Card'
+import { diasAteVencimento, alertaVencimento } from '../../lib/clientes'
 
 export default function AdminRevendas() {
   const { navigate } = useOutletContext()
@@ -12,6 +13,7 @@ export default function AdminRevendas() {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
+  const [vencimento, setVencimento] = useState('')
   const [status, setStatus] = useState('ativo')
   const [saving, setSaving] = useState(false)
   const [linkRevendaId, setLinkRevendaId] = useState('')
@@ -61,6 +63,7 @@ export default function AdminRevendas() {
     const { data: revendaData, error: revendaErr } = await supabase.from('revendas').insert({
       nome: nome.trim(),
       email: email.trim(),
+      vencimento: vencimento || null,
       status,
     }).select().single()
 
@@ -85,6 +88,7 @@ export default function AdminRevendas() {
     setNome('')
     setEmail('')
     setSenha('')
+    setVencimento('')
     setStatus('ativo')
     alert('Revenda criada e login gerado com sucesso!')
     load()
@@ -124,6 +128,26 @@ export default function AdminRevendas() {
     }
   }
 
+  const alerts = useMemo(() => {
+    const out = []
+    for (const r of list) {
+      if (r.status !== 'ativo') continue
+      const a = alertaVencimento(r.vencimento)
+      if (a === 'vencido') {
+        out.push({ id: r.id, nome: r.nome, tipo: 'vencido' })
+      }
+      if (a === 'proximo') {
+        out.push({
+          id: r.id,
+          nome: r.nome,
+          tipo: 'proximo',
+          dias: diasAteVencimento(r.vencimento),
+        })
+      }
+    }
+    return out
+  }, [list])
+
   return (
     <>
       <Header
@@ -131,6 +155,28 @@ export default function AdminRevendas() {
         subtitle="Criar, bloquear e vincular usuários"
         onSignOut={() => navigate('/login', { replace: true })}
       />
+
+      {alerts.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-900/50 bg-amber-950/30 p-4">
+          <p className="text-sm font-semibold text-amber-200">Alertas de vencimento (Revendas Ativas)</p>
+          <ul className="mt-2 list-inside list-disc text-sm text-amber-100/90">
+            {alerts.map((a, i) => (
+              <li key={`${a.id}-${i}`}>
+                {a.tipo === 'vencido' && (
+                  <span>
+                    <strong>{a.nome}</strong> — vencido
+                  </span>
+                )}
+                {a.tipo === 'proximo' && (
+                  <span>
+                    <strong>{a.nome}</strong> — vence em {a.dias} dia(s)
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mb-8 grid gap-6 lg:grid-cols-2">
         <Card title="Nova revenda">
@@ -159,6 +205,14 @@ export default function AdminRevendas() {
               onChange={(e) => setSenha(e.target.value)}
               className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
             />
+            <label className="text-xs text-gray-500">Data de Vencimento</label>
+            <input
+              type="date"
+              value={vencimento}
+              onChange={(e) => setVencimento(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            />
+            <label className="text-xs text-gray-500 mt-2 block">Status Inicial</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -224,6 +278,7 @@ export default function AdminRevendas() {
                 <tr className="border-b border-gray-700 text-gray-400">
                   <th className="pb-2 pr-4">Nome</th>
                   <th className="pb-2 pr-4">E-mail</th>
+                  <th className="pb-2 pr-4">Vencimento</th>
                   <th className="pb-2 pr-4">Status</th>
                   <th className="pb-2">Ações</th>
                 </tr>
@@ -233,6 +288,7 @@ export default function AdminRevendas() {
                   <tr key={r.id} className="border-b border-gray-800">
                     <td className="py-3 pr-4 text-white">{r.nome}</td>
                     <td className="py-3 pr-4 text-gray-300">{r.email}</td>
+                    <td className="py-3 pr-4 text-gray-400">{r.vencimento ? new Date(r.vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}</td>
                     <td className="py-3 pr-4">
                       <span
                         className={
