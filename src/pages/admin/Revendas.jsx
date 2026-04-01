@@ -99,6 +99,13 @@ export default function AdminRevendas() {
     else load()
   }
 
+  async function remove(id) {
+    if (!confirm('Deseja realmente excluir esta revenda? Esta ação apagará todos os clientes vinculados a ela!')) return
+    const { error } = await supabase.from('revendas').delete().eq('id', id)
+    if (error) alert(error.message)
+    else load()
+  }
+
   async function handleLinkUser(e) {
     e.preventDefault()
     setLinkMsg('')
@@ -242,7 +249,7 @@ export default function AdminRevendas() {
                         <button
                           type="button"
                           onClick={() => toggleStatus(r, 'bloqueado')}
-                          className="text-sm text-amber-400 hover:underline"
+                          className="text-sm text-amber-400 hover:underline mr-4"
                         >
                           Bloquear
                         </button>
@@ -250,11 +257,18 @@ export default function AdminRevendas() {
                         <button
                           type="button"
                           onClick={() => toggleStatus(r, 'ativo')}
-                          className="text-sm text-emerald-400 hover:underline"
+                          className="text-sm text-emerald-400 hover:underline mr-4"
                         >
                           Ativar
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => remove(r.id)}
+                        className="text-sm text-red-500 hover:underline"
+                      >
+                        Excluir
+                      </button>
                     </td>
                   </tr>
                 ))}
