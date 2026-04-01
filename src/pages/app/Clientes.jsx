@@ -31,6 +31,7 @@ export default function Clientes() {
   const [filtroStatus, setFiltroStatus] = useState('todos')
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({
     nome: '',
     whatsapp: '',
@@ -91,6 +92,7 @@ export default function Clientes() {
       vencimento: '',
       status: 'ativo',
     })
+    setModalOpen(true)
   }
 
   function openEdit(c) {
@@ -105,6 +107,12 @@ export default function Clientes() {
       vencimento: c.vencimento || '',
       status: c.status,
     })
+    setModalOpen(true)
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+    setEditing(null)
   }
 
   async function handleSubmit(e) {
@@ -144,6 +152,7 @@ export default function Clientes() {
       vencimento: '',
       status: 'ativo',
     })
+    setModalOpen(false)
     load()
   }
 
@@ -259,9 +268,11 @@ export default function Clientes() {
         </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title={editing ? 'Editar cliente' : 'Novo cliente'}>
-          <form onSubmit={handleSubmit} className="space-y-3">
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-md my-auto">
+            <Card title={editing ? 'Editar cliente' : 'Novo cliente'}>
+              <form onSubmit={handleSubmit} className="space-y-3">
             <input
               required
               placeholder="Nome"
@@ -319,27 +330,29 @@ export default function Clientes() {
               <option value="teste">Teste</option>
               <option value="suspenso">Suspenso</option>
             </select>
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-3">
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
               >
-                {editing ? 'Salvar' : 'Criar'}
+                {editing ? 'Salvar Configurações' : 'Criar Cliente'}
               </button>
-              {editing && (
-                <button
-                  type="button"
-                  onClick={openNew}
-                  className="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300"
-                >
-                  Cancelar edição
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={closeModal}
+                className="flex-1 rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800"
+              >
+                Cancelar
+              </button>
             </div>
           </form>
-        </Card>
+            </Card>
+          </div>
+        </div>
+      )}
 
+      <div className="w-full">
         <Card title="Lista">
           {loading ? (
             <p className="text-gray-400">Carregando…</p>
