@@ -1,0 +1,58 @@
+================================================================================
+PARTE 1 — LOGIN ADMIN (faça ANTES de publicar)
+================================================================================
+
+A) Supabase → SQL Editor: rode na ordem (se ainda não rodou):
+   1) supabase/schema.sql
+   2) supabase/bootstrap-admin.sql
+
+B) Supabase → Authentication → Users
+   - Crie o usuário matheush.h207@gmail.com com senha (ou use o que já existe).
+
+C) Authentication → Providers → Email
+   - Desligue "Confirm email" (evita depender de link no e-mail para entrar).
+
+D) Authentication → URL Configuration (ajuste de novo depois do deploy)
+   - Por enquanto em dev: Site URL = http://localhost:3000
+   - Redirect URLs: http://localhost:3000/**
+
+E) Teste local: npm run dev → http://localhost:3000/login
+   - Entre com o e-mail admin + senha.
+   - A função bootstrap_platform_admin cria o perfil admin na primeira vez.
+
+================================================================================
+PARTE 2 — PUBLICAR ONLINE (ex.: Vercel)
+================================================================================
+
+1) Conta em https://vercel.com → Add New → Project → importe o repositório Git
+   (ou faça deploy da pasta com Vercel CLI).
+
+2) Build settings (geralmente detecta sozinho):
+   - Build command: npm run build
+   - Output directory: dist
+
+3) Environment Variables (no painel do projeto Vercel → Settings → Environment):
+   VITE_SUPABASE_URL = https://qghdhewbssfatxmhnwng.supabase.co
+   VITE_SUPABASE_ANON_KEY = (cole a anon key do Supabase → Settings → API)
+
+   Marque Production (e Preview se quiser).
+
+4) Deploy. Anote a URL final, ex.: https://gestor-stream.vercel.app
+
+5) Supabase → Authentication → URL Configuration (OBRIGATÓRIO após ter a URL):
+   - Site URL: https://SUA-URL-NA-VERCEL.vercel.app
+   - Additional Redirect URLs: adicione a mesma URL com /**
+     Ex.: https://gestor-stream.vercel.app/**
+
+6) Teste o login nessa URL. Se der tela branca em /admin, confira se o deploy
+   usou o vercel.json (rotas do React caem no index.html).
+
+================================================================================
+Outros hosts (Netlify / Cloudflare Pages)
+================================================================================
+
+- Build: npm run build  |  Publish directory: dist
+- Defina as mesmas variáveis VITE_SUPABASE_* no painel do host.
+- Netlify: o arquivo public/_redirects já redireciona SPA para index.html.
+
+================================================================================

@@ -1,0 +1,217 @@
+import { useEffect, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
+import Header from '../../components/Header'
+import Card from '../../components/Card'
+
+export default function AdminRevendas() {
+  const { navigate } = useOutletContext()
+  const [list, setList] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [nome, setNome] = useState('')
+  const [email, setEmail] = useState('')
+  const [status, setStatus] = useState('ativo')
+  const [saving, setSaving] = useState(false)
+  const [linkRevendaId, setLinkRevendaId] = useState('')
+  const [linkEmail, setLinkEmail] = useState('')
+  const [linkMsg, setLinkMsg] = useState('')
+
+  async function load() {
+    const { data, error } = await supabase
+      .from('revendas')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (!error && data) setList(data)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  async function handleCreate(e) {
+    e.preventDefault()
+    setSaving(true)
+    const { error } = await supabase.from('revendas').insert({
+      nome: nome.trim(),
+      email: email.trim(),
+      status,
+    })
+    setSaving(false)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    setNome('')
+    setEmail('')
+    setStatus('ativo')
+    load()
+  }
+
+  async function toggleStatus(row, next) {
+    const { error } = await supabase
+      .from('revendas')
+      .update({ status: next })
+      .eq('id', row.id)
+    if (error) alert(error.message)
+    else load()
+  }
+
+  async function handleLinkUser(e) {
+    e.preventDefault()
+    setLinkMsg('')
+    if (!linkRevendaId || !linkEmail.trim()) {
+      setLinkMsg('Selecione a revenda e informe o e-mail.')
+      return
+    }
+    const { error } = await supabase.rpc('admin_link_revenda_user', {
+      p_revenda_id: linkRevendaId,
+      p_email: linkEmail.trim(),
+    })
+    if (error) setLinkMsg(error.message)
+    else {
+      setLinkMsg('Usuário vinculado com sucesso.')
+      setLinkEmail('')
+    }
+  }
+
+  return (
+    <>
+      <Header
+        title="Revendas"
+        subtitle="Criar, bloquear e vincular usuários"
+        onSignOut={() => navigate('/login', { replace: true })}
+      />
+
+      <div className="mb-8 grid gap-6 lg:grid-cols-2">
+        <Card title="Nova revenda">
+          <form onSubmit={handleCreate} className="space-y-3">
+            <input
+              placeholder="Nome"
+              required
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            />
+            <input
+              type="email"
+              placeholder="E-mail de contato"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            />
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            >
+              <option value="ativo">Ativo</option>
+              <option value="bloqueado">Bloqueado</option>
+            </select>
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {saving ? 'Salvando…' : 'Criar revenda'}
+            </button>
+          </form>
+        </Card>
+
+        <Card title="Vincular usuário à revenda">
+          <p className="mb-3 text-xs text-gray-500">
+            Crie o usuário em Supabase → Authentication → Users (e-mail/senha). Depois
+            vincule o e-mail aqui.
+          </p>
+          <form onSubmit={handleLinkUser} className="space-y-3">
+            <select
+              value={linkRevendaId}
+              onChange={(e) => setLinkRevendaId(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+              required
+            >
+              <option value="">Revenda…</option>
+              {list.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nome}
+                </option>
+              ))}
+            </select>
+            <input
+              type="email"
+              placeholder="E-mail do usuário (já cadastrado no Auth)"
+              value={linkEmail}
+              onChange={(e) => setLinkEmail(e.target.value)}
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            />
+            <button
+              type="submit"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            >
+              Vincular
+            </button>
+            {linkMsg && <p className="text-sm text-gray-400">{linkMsg}</p>}
+          </form>
+        </Card>
+      </div>
+
+      <Card title="Lista de revendas">
+        {loading ? (
+          <p className="text-gray-400">Carregando…</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-700 text-gray-400">
+                  <th className="pb-2 pr-4">Nome</th>
+                  <th className="pb-2 pr-4">E-mail</th>
+                  <th className="pb-2 pr-4">Status</th>
+                  <th className="pb-2">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.id} className="border-b border-gray-800">
+                    <td className="py-3 pr-4 text-white">{r.nome}</td>
+                    <td className="py-3 pr-4 text-gray-300">{r.email}</td>
+                    <td className="py-3 pr-4">
+                      <span
+                        className={
+                          r.status === 'ativo'
+                            ? 'text-emerald-400'
+                            : 'text-red-400'
+                        }
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="py-3">
+                      {r.status === 'ativo' ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleStatus(r, 'bloqueado')}
+                          className="text-sm text-amber-400 hover:underline"
+                        >
+                          Bloquear
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => toggleStatus(r, 'ativo')}
+                          className="text-sm text-emerald-400 hover:underline"
+                        >
+                          Ativar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  )
+}
