@@ -30,3 +30,20 @@ export function alertaVencimento(vencimento) {
   if (dias <= 3) return 'proximo'
   return null
 }
+
+export function calcularNovaDataVencimento(dataAtual, meses) {
+  let base = new Date()
+  if (dataAtual) {
+    const d = new Date(dataAtual)
+    if (!Number.isNaN(d.getTime())) {
+      base = d
+    }
+  }
+
+  const nova = new Date(base)
+  // Adiciona os meses
+  nova.setMonth(nova.getMonth() + meses)
+
+  // Formato YYYY-MM-DD para o input type="date"
+  return nova.toISOString().split('T')[0]
+}

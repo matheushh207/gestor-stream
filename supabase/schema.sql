@@ -40,7 +40,9 @@ create table if not exists public.pagamentos (
   cliente_id uuid not null references public.clientes (id) on delete cascade,
   valor numeric(12,2) not null,
   metodo text not null check (metodo in ('pix', 'dinheiro', 'cartao')),
-  pago_em timestamptz not null default now()
+  pago_em timestamptz not null default now(),
+  vencimento_anterior date,
+  vencimento_novo date
 );
 
 create index if not exists idx_user_revenda_user on public.user_revenda (user_id);

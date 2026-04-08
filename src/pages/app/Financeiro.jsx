@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Header from '../../components/Header'
 import Card from '../../components/Card'
+import { calcularNovaDataVencimento, statusFromVencimento } from '../../lib/clientes'
 
 export default function Financeiro() {
   const { navigate, revendaId } = useOutletContext()
@@ -14,6 +15,7 @@ export default function Financeiro() {
     cliente_id: '',
     valor: '',
     metodo: 'pix',
+    duracao: '1',
     pago_em: new Date().toISOString().slice(0, 16),
   })
   const [saving, setSaving] = useState(false)
@@ -22,7 +24,7 @@ export default function Financeiro() {
     if (!revendaId) return
     const { data: cRows } = await supabase
       .from('clientes')
-      .select('id, nome')
+      .select('id, nome, valor, vencimento, status')
       .eq('revenda_id', revendaId)
       .order('nome')
     setClientes(cRows ?? [])
@@ -60,30 +62,104 @@ export default function Financeiro() {
     return filtered.reduce((s, p) => s + Number(p.valor || 0), 0)
   }, [filtered])
 
+  function handleSelectCliente(id) {
+    const cliente = clientes.find(c => c.id === id)
+    setForm({
+      ...form,
+      cliente_id: id,
+      valor: cliente ? String(cliente.valor || '') : '',
+    })
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.cliente_id) {
       alert('Selecione um cliente.')
       return
     }
+    
+    const cliente = clientes.find(c => c.id === form.cliente_id)
+    if (!cliente) return
+
     setSaving(true)
-    const { error } = await supabase.from('pagamentos').insert({
+    
+    const vencimentoAnterior = cliente.vencimento
+    const meses = parseInt(form.duracao)
+    const vencimentoNovo = calcularNovaDataVencimento(vencimentoAnterior, meses)
+
+    // 1. Registrar pagamento
+    const { data: paymentData, error: paymentError } = await supabase.from('pagamentos').insert({
       cliente_id: form.cliente_id,
       valor: Number(form.valor),
       metodo: form.metodo,
       pago_em: new Date(form.pago_em).toISOString(),
-    })
+      vencimento_anterior: vencimentoAnterior,
+      vencimento_novo: vencimentoNovo
+    }).select().single()
+
+    if (paymentError) {
+      alert(paymentError.message)
+      setSaving(false)
+      return
+    }
+
+    // 2. Atualizar cliente (vencimento e status)
+    const novoStatus = statusFromVencimento(vencimentoNovo, cliente.status)
+    const { error: clientError } = await supabase
+      .from('clientes')
+      .update({ 
+        vencimento: vencimentoNovo,
+        status: novoStatus
+      })
+      .eq('id', form.cliente_id)
+
     setSaving(false)
-    if (error) alert(error.message)
-    else {
+    
+    if (clientError) {
+      alert('Pagamento registrado, mas erro ao atualizar cliente: ' + clientError.message)
+    } else {
       setForm({
         cliente_id: '',
         valor: '',
         metodo: 'pix',
+        duracao: '1',
         pago_em: new Date().toISOString().slice(0, 16),
       })
       load()
     }
+  }
+
+  async function handleDelete(p) {
+    if (!confirm('Deseja excluir este pagamento? A renovação do cliente será desfeita.')) return
+    
+    setLoading(true)
+    
+    // 1. Restaurar vencimento do cliente
+    const { error: clientError } = await supabase
+      .from('clientes')
+      .update({ 
+        vencimento: p.vencimento_anterior,
+        status: statusFromVencimento(p.vencimento_anterior, 'ativo') // Simplificado
+      })
+      .eq('id', p.cliente_id)
+    
+    if (clientError) {
+      alert('Erro ao restaurar cliente: ' + clientError.message)
+      setLoading(false)
+      return
+    }
+
+    // 2. Deletar pagamento
+    const { error: deleteError } = await supabase
+      .from('pagamentos')
+      .delete()
+      .eq('id', p.id)
+    
+    if (deleteError) {
+      alert('Erro ao deletar pagamento: ' + deleteError.message)
+    }
+    
+    load()
   }
 
   return (
@@ -101,14 +177,12 @@ export default function Financeiro() {
           </p>
         </Card>
         <div className="lg:col-span-2">
-          <Card title="Registrar pagamento">
+          <Card title="Registrar pagamento e Renovação">
             <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2">
               <select
                 required
                 value={form.cliente_id}
-                onChange={(e) =>
-                  setForm({ ...form, cliente_id: e.target.value })
-                }
+                onChange={(e) => handleSelectCliente(e.target.value)}
                 className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white sm:col-span-2"
               >
                 <option value="">Cliente…</option>
@@ -128,6 +202,15 @@ export default function Financeiro() {
                 className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
               />
               <select
+                value={form.duracao}
+                onChange={(e) => setForm({ ...form, duracao: e.target.value })}
+                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+              >
+                <option value="1">Renovar 1 Mês</option>
+                <option value="3">Renovar 3 Meses</option>
+                <option value="12">Renovar 1 Ano</option>
+              </select>
+              <select
                 value={form.metodo}
                 onChange={(e) => setForm({ ...form, metodo: e.target.value })}
                 className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
@@ -140,21 +223,21 @@ export default function Financeiro() {
                 type="datetime-local"
                 value={form.pago_em}
                 onChange={(e) => setForm({ ...form, pago_em: e.target.value })}
-                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white sm:col-span-2"
+                className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
               />
               <button
                 type="submit"
                 disabled={saving}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 sm:col-span-2"
               >
-                {saving ? 'Salvando…' : 'Registrar'}
+                {saving ? 'Registrando…' : 'Registrar Pago e Renovar'}
               </button>
             </form>
           </Card>
         </div>
       </div>
 
-      <Card title="Pagamentos">
+      <Card title="Histórico de Pagamentos">
         <div className="mb-4 flex flex-wrap items-center gap-4">
           <label className="text-sm text-gray-400">Filtrar por cliente</label>
           <select
@@ -180,7 +263,8 @@ export default function Financeiro() {
                   <th className="pb-2 pr-4">Cliente</th>
                   <th className="pb-2 pr-4">Valor</th>
                   <th className="pb-2 pr-4">Método</th>
-                  <th className="pb-2">Data</th>
+                  <th className="pb-2 pr-4">Data Registro</th>
+                  <th className="pb-2">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -192,16 +276,24 @@ export default function Financeiro() {
                     <td className="py-2 pr-4 text-emerald-300">
                       R$ {Number(p.valor).toFixed(2)}
                     </td>
-                    <td className="py-2 pr-4 text-gray-300">{p.metodo}</td>
-                    <td className="py-2 text-gray-400">
+                    <td className="py-2 pr-4 text-gray-300 uppercase">{p.metodo}</td>
+                    <td className="py-2 pr-4 text-gray-400">
                       {new Date(p.pago_em).toLocaleString('pt-BR')}
+                    </td>
+                    <td className="py-2">
+                      <button
+                        onClick={() => handleDelete(p)}
+                        className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                      >
+                        Excluir / Desfazer
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {filtered.length === 0 && (
-              <p className="mt-4 text-sm text-gray-500">Nenhum pagamento.</p>
+              <p className="mt-4 text-sm text-gray-500">Nenhum pagamento encontrado.</p>
             )}
           </div>
         )}
