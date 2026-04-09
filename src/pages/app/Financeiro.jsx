@@ -11,13 +11,6 @@ export default function Financeiro() {
   const [pagamentos, setPagamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtroCliente, setFiltroCliente] = useState('')
-  
-  // Estado do WhatsApp
-  const [zapStatus, setZapStatus] = useState('LOADING') // LOADING, OFFLINE_API, NOT_FOUND, STARTING, QR_READY, CONNECTED, DISCONNECTED
-  const [zapQr, setZapQr] = useState(null)
-  const [zapDestino, setZapDestino] = useState('')
-  const [zapTexto, setZapTexto] = useState('Olá! Passando para avisar do seu vencimento em breve.')
-
   const [form, setForm] = useState({
     cliente_id: '',
     valor: '',
@@ -31,7 +24,7 @@ export default function Financeiro() {
     if (!revendaId) return
     const { data: cRows } = await supabase
       .from('clientes')
-      .select('id, nome, valor, vencimento, status, telefone')
+      .select('id, nome, valor, vencimento, status')
       .eq('revenda_id', revendaId)
       .order('nome')
     setClientes(cRows ?? [])
@@ -50,122 +43,9 @@ export default function Financeiro() {
     setLoading(false)
   }
 
-  const API_URL = 'http://localhost:3001/api'
-
-  async function checkZap() {
-    if (!revendaId) return
-    try {
-      const res = await fetch(`${API_URL}/status/${revendaId}`)
-      const data = await res.json()
-      setZapStatus(data.status || 'NOT_FOUND')
-      setZapQr(data.qr || null)
-    } catch(e) {
-      setZapStatus('OFFLINE_API')
-    }
-  }
-
-  useEffect(() => {
-    let interval;
-    if (zapStatus === 'STARTING' || zapStatus === 'QR_READY') {
-      interval = setInterval(checkZap, 3000)
-    }
-    return () => clearInterval(interval)
-  }, [zapStatus, revendaId])
-
   useEffect(() => {
     load()
-    checkZap()
   }, [revendaId])
-
-  async function ligarZap() {
-    setZapStatus('STARTING')
-    try {
-      await fetch(`${API_URL}/start/${revendaId}`, { method: 'POST' })
-    } catch(e) {
-      alert("Erro ao contatar API WhatsApp. O servidor Node está rodando na porta 3001?")
-      setZapStatus('OFFLINE_API')
-    }
-  }
-
-  async function desligarZap() {
-    if(!confirm("Desconectar o WhatsApp de todas as sessões?")) return
-    setZapStatus('LOADING')
-    try {
-      await fetch(`${API_URL}/logout/${revendaId}`, { method: 'DELETE' })
-      setZapStatus('DISCONNECTED')
-      setZapQr(null)
-    } catch(e) {}
-  }
-
-  async function enviarAvisoZap(numero) {
-    const destinoReal = numero || zapDestino;
-    if(!destinoReal) return alert("Houve um erro com o número de destino.")
-    try {
-      const res = await fetch(`${API_URL}/send/${revendaId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numero: destinoReal, texto: zapTexto })
-      })
-      const data = await res.json()
-      if(data.success) alert("Aviso enviado via WhatsApp com sucesso!")
-      else alert("Erro do WhatsApp: " + (data.error || "Desconhecido"))
-    } catch(e) {
-      alert("Erro de conexão com o painel do WhatsApp")
-    }
-  }
-
-  const clientesParaAviso = useMemo(() => {
-    if (!clientes.length) return [];
-    const hoje = new Date();
-    hoje.setHours(0,0,0,0);
-    
-    return clientes.map(c => {
-      if (!c.vencimento) return null;
-      const v = new Date(c.vencimento);
-      v.setHours(0,0,0,0);
-      const diffTime = v - hoje;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return { ...c, diffDays };
-    }).filter(c => c && c.diffDays <= 3 && c.status === 'ativo')
-      .sort((a, b) => a.diffDays - b.diffDays);
-  }, [clientes]);
-
-  function getMensagemHumanizada(nome, diffDays) {
-    const pNome = (nome || '').split(' ')[0];
-    if (diffDays === 3) {
-      return `Olá ${pNome}! 👋 Tudo bem?\n\nPassando rapidinho para avisar que o seu acesso vence em 3 dias. Qualquer dúvida ou se já quiser renovar pra não correr risco de esquecer, é só me chamar aqui! 😊`;
-    } else if (diffDays === 2) {
-      return `Oi ${pNome}! Tudo certo? 🚀\n\nSó um lembrete amigável que a sua assinatura vence em 2 dias. Se precisar do código PIX pra renovação, me avisa! Abração!`;
-    } else if (diffDays === 1) {
-      return `Olá ${pNome}! Passando pra avisar que a sua assinatura vence amanhã! ⏰\n\nVamos renovar pra não perder nada? Fico no aguardo!`;
-    } else if (diffDays === 0) {
-      return `Oi ${pNome}! Tudo bem? 🙌\n\nSua assinatura vence exatamente HOJE! Me manda o comprovante aqui assim que fizer a renovação pra eu já deixar tudo certinho no sistema pra você continuar assistindo, fechou?`;
-    } else {
-      return `Olá ${pNome}! Tudo bem? Vi aqui que a sua assinatura acabou passando do vencimento. 😕\n\nAcontece na correria né? Se quiser voltar a ter os acessos liberados hoje, só me dar um alô aqui pra gente renovar!`;
-    }
-  }
-
-  async function notificarAutomatico(cliente) {
-    if(zapStatus !== 'CONNECTED') return alert("O WhatsApp de envios não está conectado!")
-    if(!cliente.telefone) return alert("Esse cliente não tem número de telefone cadastrado no sistema!")
-    
-    if(!confirm(`Deseja enviar uma notificação para ${cliente.nome}?`)) return;
-
-    const textoFormatado = getMensagemHumanizada(cliente.nome, cliente.diffDays);
-    
-    try {
-      const res = await fetch(`${API_URL}/send/${revendaId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numero: cliente.telefone, texto: textoFormatado })
-      })
-      const data = await res.json()
-      if(data.success) alert(`🚀 Aviso enviado 100% no automático para o WhatsApp de ${cliente.nome}!`)
-      else alert("Erro do WhatsApp: " + (data.error || "Desconhecido"))
-    } catch(e) {
-      alert("Erro de conexão. O servidor api.js está rodando no terminal?")
-    }
-  }
 
   const nomeById = useMemo(() => {
     const m = {}
@@ -286,136 +166,9 @@ export default function Financeiro() {
     <>
       <Header
         title="Financeiro"
-        subtitle="Pagamentos, totais e Avisos"
+        subtitle="Pagamentos e totais"
         onSignOut={() => navigate('/login', { replace: true })}
       />
-
-      {/* WHATSAPP CONTAINER (SaaS API) */}
-      <div className="mb-6">
-        <Card title="Integração Oficial: Gestor Bot / WhatsApp">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-4 border-b border-gray-800 pb-4">
-              <span className={`px-3 py-1 rounded text-sm font-semibold ${
-                zapStatus === 'CONNECTED' ? 'bg-emerald-900/50 text-emerald-400' : 
-                zapStatus === 'OFFLINE_API' ? 'bg-red-900/50 text-red-400' :
-                'bg-gray-800 text-gray-300'
-              }`}>
-                Status: {
-                  zapStatus === 'CONNECTED' ? '✅ Conectado e Pronto' :
-                  zapStatus === 'QR_READY' ? '📷 Aguardando leitura de QR Code...' :
-                  zapStatus === 'STARTING' ? '⏳ Iniciando servidor Chrome...' :
-                  zapStatus === 'OFFLINE_API' ? '❌ API Desligada' : '⚠️ Desconectado'
-                }
-              </span>
-              
-              {zapStatus !== 'CONNECTED' && zapStatus !== 'STARTING' && zapStatus !== 'QR_READY' && (
-                <button onClick={ligarZap} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">
-                  Ligar WhatsApp Web
-                </button>
-              )}
-              
-              {zapStatus === 'CONNECTED' && (
-                <button onClick={desligarZap} className="rounded-lg bg-red-600/20 px-4 py-2 text-sm font-semibold text-red-400 border border-red-500 hover:bg-red-500 hover:text-white">
-                  Deslogar Dispositivo
-                </button>
-              )}
-            </div>
-
-            {zapStatus === 'QR_READY' && zapQr && (
-              <div className="bg-white p-2 rounded w-fit">
-                <img src={zapQr} alt="QR Code WhatsApp" className="w-[200px] h-[200px]" />
-              </div>
-            )}
-
-            {zapStatus === 'CONNECTED' && (
-              <div className="flex flex-col gap-6 mt-2">
-                
-                {/* AUTO CRM */}
-                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-lg shadow-black/20">
-                  <h3 className="text-gray-200 font-semibold mb-3 flex items-center gap-2">
-                    🎯 Central de Cobranças (Automática)
-                    <span className="bg-indigo-600/20 text-indigo-400 text-xs px-2 py-0.5 rounded-full">{clientesParaAviso.length} alertas</span>
-                  </h3>
-                  
-                  {clientesParaAviso.length === 0 ? (
-                    <p className="text-sm text-emerald-400/80 bg-emerald-900/20 px-3 py-2 rounded">✨ Nenhum cliente prestes a vencer. Sua base está em dia!</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead>
-                          <tr className="border-b border-gray-800 text-gray-400">
-                            <th className="pb-2">Cliente</th>
-                            <th className="pb-2">Situação</th>
-                            <th className="pb-2">ZAP Cadastrado</th>
-                            <th className="pb-2 text-right">Ação Rápida (SaaS)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {clientesParaAviso.map(c => (
-                            <tr key={c.id} className="border-b border-gray-800/50">
-                              <td className="py-2 text-white font-medium">{c.nome}</td>
-                              <td className="py-2">
-                                <span className={`text-xs px-2 py-1 rounded font-semibold ${
-                                  c.diffDays === 0 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                                  c.diffDays < 0 ? 'bg-red-500/20 text-red-500 border border-red-500/30' :
-                                  'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
-                                }`}>
-                                  {c.diffDays === 0 ? '⚠️ VENCE HOJE' : c.diffDays < 0 ? `⛔ VENCIDO (${Math.abs(c.diffDays)}d)` : `Faltam ${c.diffDays} dias`}
-                                </span>
-                              </td>
-                              <td className="py-2 text-gray-400/80 text-xs">{c.telefone || 'Falta Cadastro'}</td>
-                              <td className="py-2 text-right">
-                                <button
-                                  onClick={() => notificarAutomatico(c)}
-                                  disabled={!c.telefone}
-                                  className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs font-semibold shadow shadow-indigo-900/20 transition-all flex items-center gap-2 ml-auto"
-                                >
-                                  Mandar Aviso
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-
-                {/* DISPARO AVULSO */}
-                <div className="grid gap-3 sm:grid-cols-2 pt-4 border-t border-gray-800">
-                  <p className="text-gray-400 text-sm font-semibold sm:col-span-2 mb-1">Disparo Manual / Avulso</p>
-                  <input
-                  type="text"
-                  placeholder="Selecione um cliente lá embaixo ou digite o número (DDD) aqui"
-                  value={zapDestino}
-                  onChange={e => setZapDestino(e.target.value)}
-                  className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
-                />
-                <select
-                  value={zapTexto}
-                  onChange={e => setZapTexto(e.target.value)}
-                  className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
-                >
-                  <option value="Olá! Passando para avisar do seu vencimento em breve.">Alerta: Vence em Breve</option>
-                  <option value="Aviso: Seu plano venceu hoje. Podemos renovar?">Alerta: Venceu Hoje</option>
-                  <option value="Confirmação: Pagamento Recebido!">Pagamento Confirmado</option>
-                </select>
-                <div className="sm:col-span-2">
-                  <button onClick={() => enviarAvisoZap()} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
-                    Testar Disparo Rápido (Selecione Acima)
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {zapStatus === 'OFFLINE_API' && (
-              <p className="text-sm text-red-400">
-                Acesse a sua pasta local ChatBotIPTV, abra o terminal e rode: <code className="bg-black px-1 rounded">node api.js</code> para ligar o servidor MVP da revenda localmente.
-              </p>
-            )}
-          </div>
-        </Card>
-      </div>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
         <Card title="Total recebido (filtro atual)">
@@ -528,27 +281,12 @@ export default function Financeiro() {
                       {new Date(p.pago_em).toLocaleString('pt-BR')}
                     </td>
                     <td className="py-2">
-                      <div className="flex flex-col gap-2">
-                        <button
-                          onClick={() => {
-                            if(zapStatus !== 'CONNECTED') return alert("Conecte o Whatsapp no topo da página primeiro.")
-                            // Procurando pelo numero do cliente na base local, mas como talvez nao tenha no supabase,
-                            // vamos só avisar ao admin que ele precisa do campo telefone preenchido
-                            const cliente = clientes.find(c => c.id === p.cliente_id)
-                            setZapDestino(cliente?.telefone || '') // se o db possuir
-                            alert(`Pronto para Enviar! O número do cliente ${nomeById[p.cliente_id]} ficava no preenchimento do Disparo Rápido. Se não carregou, digite manualmente. (É necessário um campo Telefone na Tabela Clientes)`)
-                          }}
-                          className={`${zapStatus === 'CONNECTED' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-gray-800 text-gray-500 cursor-not-allowed'} px-2 py-1 rounded text-xs font-semibold whitespace-nowrap mb-1`}
-                        >
-                          Lembrar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p)}
-                          className="text-red-400 hover:text-red-300 text-xs font-semibold whitespace-nowrap"
-                        >
-                          Desfazer Pago
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleDelete(p)}
+                        className="text-red-400 hover:text-red-300 text-xs font-semibold"
+                      >
+                        Excluir / Desfazer
+                      </button>
                     </td>
                   </tr>
                 ))}
