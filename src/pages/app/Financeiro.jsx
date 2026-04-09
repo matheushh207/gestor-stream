@@ -31,7 +31,7 @@ export default function Financeiro() {
     if (!revendaId) return
     const { data: cRows } = await supabase
       .from('clientes')
-      .select('id, nome, valor, vencimento, status')
+      .select('id, nome, valor, vencimento, status, telefone')
       .eq('revenda_id', revendaId)
       .order('nome')
     setClientes(cRows ?? [])
@@ -111,6 +111,59 @@ export default function Financeiro() {
       else alert("Erro do WhatsApp: " + (data.error || "Desconhecido"))
     } catch(e) {
       alert("Erro de conexão com o painel do WhatsApp")
+    }
+  }
+
+  const clientesParaAviso = useMemo(() => {
+    if (!clientes.length) return [];
+    const hoje = new Date();
+    hoje.setHours(0,0,0,0);
+    
+    return clientes.map(c => {
+      if (!c.vencimento) return null;
+      const v = new Date(c.vencimento);
+      v.setHours(0,0,0,0);
+      const diffTime = v - hoje;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return { ...c, diffDays };
+    }).filter(c => c && c.diffDays <= 3 && c.status === 'ativo')
+      .sort((a, b) => a.diffDays - b.diffDays);
+  }, [clientes]);
+
+  function getMensagemHumanizada(nome, diffDays) {
+    const pNome = (nome || '').split(' ')[0];
+    if (diffDays === 3) {
+      return `Olá ${pNome}! 👋 Tudo bem?\n\nPassando rapidinho para avisar que o seu acesso vence em 3 dias. Qualquer dúvida ou se já quiser renovar pra não correr risco de esquecer, é só me chamar aqui! 😊`;
+    } else if (diffDays === 2) {
+      return `Oi ${pNome}! Tudo certo? 🚀\n\nSó um lembrete amigável que a sua assinatura vence em 2 dias. Se precisar do código PIX pra renovação, me avisa! Abração!`;
+    } else if (diffDays === 1) {
+      return `Olá ${pNome}! Passando pra avisar que a sua assinatura vence amanhã! ⏰\n\nVamos renovar pra não perder nada? Fico no aguardo!`;
+    } else if (diffDays === 0) {
+      return `Oi ${pNome}! Tudo bem? 🙌\n\nSua assinatura vence exatamente HOJE! Me manda o comprovante aqui assim que fizer a renovação pra eu já deixar tudo certinho no sistema pra você continuar assistindo, fechou?`;
+    } else {
+      return `Olá ${pNome}! Tudo bem? Vi aqui que a sua assinatura acabou passando do vencimento. 😕\n\nAcontece na correria né? Se quiser voltar a ter os acessos liberados hoje, só me dar um alô aqui pra gente renovar!`;
+    }
+  }
+
+  async function notificarAutomatico(cliente) {
+    if(zapStatus !== 'CONNECTED') return alert("O WhatsApp de envios não está conectado!")
+    if(!cliente.telefone) return alert("Esse cliente não tem número de telefone cadastrado no sistema!")
+    
+    if(!confirm(`Deseja enviar uma notificação para ${cliente.nome}?`)) return;
+
+    const textoFormatado = getMensagemHumanizada(cliente.nome, cliente.diffDays);
+    
+    try {
+      const res = await fetch(`${API_URL}/send/${revendaId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numero: cliente.telefone, texto: textoFormatado })
+      })
+      const data = await res.json()
+      if(data.success) alert(`🚀 Aviso enviado 100% no automático para o WhatsApp de ${cliente.nome}!`)
+      else alert("Erro do WhatsApp: " + (data.error || "Desconhecido"))
+    } catch(e) {
+      alert("Erro de conexão. O servidor api.js está rodando no terminal?")
     }
   }
 
@@ -275,8 +328,63 @@ export default function Financeiro() {
             )}
 
             {zapStatus === 'CONNECTED' && (
-              <div className="grid gap-3 sm:grid-cols-2 mt-2">
-                <input
+              <div className="flex flex-col gap-6 mt-2">
+                
+                {/* AUTO CRM */}
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 shadow-lg shadow-black/20">
+                  <h3 className="text-gray-200 font-semibold mb-3 flex items-center gap-2">
+                    🎯 Central de Cobranças (Automática)
+                    <span className="bg-indigo-600/20 text-indigo-400 text-xs px-2 py-0.5 rounded-full">{clientesParaAviso.length} alertas</span>
+                  </h3>
+                  
+                  {clientesParaAviso.length === 0 ? (
+                    <p className="text-sm text-emerald-400/80 bg-emerald-900/20 px-3 py-2 rounded">✨ Nenhum cliente prestes a vencer. Sua base está em dia!</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-800 text-gray-400">
+                            <th className="pb-2">Cliente</th>
+                            <th className="pb-2">Situação</th>
+                            <th className="pb-2">ZAP Cadastrado</th>
+                            <th className="pb-2 text-right">Ação Rápida (SaaS)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {clientesParaAviso.map(c => (
+                            <tr key={c.id} className="border-b border-gray-800/50">
+                              <td className="py-2 text-white font-medium">{c.nome}</td>
+                              <td className="py-2">
+                                <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                                  c.diffDays === 0 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                  c.diffDays < 0 ? 'bg-red-500/20 text-red-500 border border-red-500/30' :
+                                  'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
+                                }`}>
+                                  {c.diffDays === 0 ? '⚠️ VENCE HOJE' : c.diffDays < 0 ? `⛔ VENCIDO (${Math.abs(c.diffDays)}d)` : `Faltam ${c.diffDays} dias`}
+                                </span>
+                              </td>
+                              <td className="py-2 text-gray-400/80 text-xs">{c.telefone || 'Falta Cadastro'}</td>
+                              <td className="py-2 text-right">
+                                <button
+                                  onClick={() => notificarAutomatico(c)}
+                                  disabled={!c.telefone}
+                                  className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs font-semibold shadow shadow-indigo-900/20 transition-all flex items-center gap-2 ml-auto"
+                                >
+                                  Mandar Aviso
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* DISPARO AVULSO */}
+                <div className="grid gap-3 sm:grid-cols-2 pt-4 border-t border-gray-800">
+                  <p className="text-gray-400 text-sm font-semibold sm:col-span-2 mb-1">Disparo Manual / Avulso</p>
+                  <input
                   type="text"
                   placeholder="Selecione um cliente lá embaixo ou digite o número (DDD) aqui"
                   value={zapDestino}
