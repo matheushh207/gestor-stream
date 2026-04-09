@@ -149,14 +149,14 @@ export default function AppDashboard() {
         const derived = statusFromVencimento(c.vencimento, c.status)
         const a = alertaVencimento(c.vencimento)
         if (a === 'vencido')
-          warn.push({ cliente: c.nome, tipo: 'vencido', dias: -1, id: c.id, telefone: c.telefone })
+          warn.push({ cliente: c.nome, tipo: 'vencido', dias: -1, id: c.id, telefone: c.whatsapp })
         if (a === 'proximo')
           warn.push({
             cliente: c.nome,
             tipo: 'proximo',
             dias: diasAteVencimento(c.vencimento),
             id: c.id,
-            telefone: c.telefone
+            telefone: c.whatsapp
           })
       }
       setAlerts(warn)
