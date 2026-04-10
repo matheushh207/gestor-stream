@@ -94,18 +94,18 @@ export default function AppDashboard() {
   function getMensagemHumanizada(nome, diasAte, tipo) {
     const pNome = (nome || '').split(' ')[0];
     if (tipo === 'vencido') {
-      return `Olá ${pNome}! Tudo bem? Vi aqui que a sua assinatura acabou passando do vencimento. 😕\n\nAcontece na correria né? Se quiser voltar a ter os acessos liberados hoje, só dar um alô aqui pra gente renovar!`;
+      return `Oi ${pNome}! Tudo tranquilo por aí? 😕\n\nVi aqui que o seu acesso acabou passando do vencimento. Na correria acaba passando batido, né? Se quiser liberar os acessos de novo pra continuar curtindo, é só me mandar um alô aqui que a gente já renova! Um abração!`;
     }
     
     // proximo
     if (diasAte === 3) {
-      return `Olá ${pNome}! 👋 Tudo bem?\n\nPassando rapidinho para avisar que o seu acesso vence em 3 dias. Qualquer dúvida ou se já quiser renovar pra não correr risco de esquecer, é só me chamar aqui! 😊`;
+      return `Oi ${pNome}! Tudo belezinha? 👋\n\nPassando aqui rapidinho só pra te dar um toque que o seu acesso vence daqui a 3 dias, viu? Qualquer dúvida ou se preferir já adiantar a renovação pra não esquecer, é só mandar mensagem por aqui! Um abraço!`;
     } else if (diasAte === 2) {
       return `Oi ${pNome}! Tudo tranquilo? 🚀\n\nPassando rapidinho só pra te avisar que o seu acesso vence daqui a 2 dias, tá bom? Se já quiser garantindo a renovação pra não correr o risco de ficar sem e precisar do PIX, é só me dar um toque! Um abraço!`;
     } else if (diasAte === 1) {
-      return `Olá ${pNome}! Passando pra avisar que a sua assinatura vence amanhã! ⏰\n\nVamos renovar pra não perder nada? Fico no aguardo!`;
+      return `Oi ${pNome}! Tudo na paz? ⏰\n\nDando uma passadinha pra avisar que o seu acesso vence amanhã, tá bom? Se já quiser ir acertando a renovação pra não correr o risco de ficar sem, é só me chamar aqui! Um abraço!`;
     } else if (diasAte === 0) {
-       return `Oi ${pNome}! Tudo bem? 🙌\n\nSua assinatura vence exatamente HOJE! Me manda o comprovante aqui assim que fizer a renovação pra eu já deixar tudo certinho no seu plano fechou?`;
+       return `Oi ${pNome}! Tudo certo? 🙌\n\nPassando rápido pra te avisar que a sua assinatura vence exatamente HOJE, viu? Assim que fizer a renovação, me manda o comprovante aqui pra eu já deixar tudo certinho no sistema e você não ficar sem acesso, fechou? Tamo junto!`;
     }
     
     // Default fallback
