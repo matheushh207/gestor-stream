@@ -101,7 +101,7 @@ export default function AppDashboard() {
     if (diasAte === 3) {
       return `Olá ${pNome}! 👋 Tudo bem?\n\nPassando rapidinho para avisar que o seu acesso vence em 3 dias. Qualquer dúvida ou se já quiser renovar pra não correr risco de esquecer, é só me chamar aqui! 😊`;
     } else if (diasAte === 2) {
-      return `Oi ${pNome}! Tudo certo? 🚀\n\nSó um lembrete amigável que a sua assinatura vence em 2 dias. Se precisar do código PIX pra renovação, me avisa! Abração!`;
+      return `Oi ${pNome}! Tudo tranquilo? 🚀\n\nPassando rapidinho só pra te avisar que o seu acesso vence daqui a 2 dias, tá bom? Se já quiser garantindo a renovação pra não correr o risco de ficar sem e precisar do PIX, é só me dar um toque! Um abraço!`;
     } else if (diasAte === 1) {
       return `Olá ${pNome}! Passando pra avisar que a sua assinatura vence amanhã! ⏰\n\nVamos renovar pra não perder nada? Fico no aguardo!`;
     } else if (diasAte === 0) {
