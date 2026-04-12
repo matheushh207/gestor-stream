@@ -6,3 +6,5 @@ dist
 !.env.example
 .cursor
 *.local
+.wwebjs_auth
+.wwebjs_cache
