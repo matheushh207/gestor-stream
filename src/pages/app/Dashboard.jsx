@@ -40,7 +40,7 @@ export default function AppDashboard() {
   const [zapStatus, setZapStatus] = useState('LOADING')
   const [zapQr, setZapQr] = useState(null)
 
-  const API_URL = 'http://localhost:3001/api'
+  const API_URL = import.meta.env.VITE_WHATSAPP_API_URL || 'http://localhost:3001/api'
 
   async function checkZap() {
     if (!revendaId) return
