@@ -76,7 +76,7 @@ export default function AppDashboard() {
     try {
       await fetch(`${API_URL}/start/${revendaId}`, { method: 'POST' })
     } catch (e) {
-      alert("Erro ao contatar API WhatsApp. O servidor Node está rodando na porta 3001?")
+      alert("Não foi possível alcançar o motor no Render. Ele pode estar iniciando ou o endereço está incorreto.")
       setZapStatus('OFFLINE_API')
     }
   }
@@ -264,9 +264,15 @@ export default function AppDashboard() {
             )}
 
             {zapStatus === 'OFFLINE_API' && (
-              <p className="text-sm text-red-400">
-                O motor de mensagens está desligado. Abra o terminal na pasta <code className="bg-black px-1 rounded">Gestor Stream</code> e rode: <code className="bg-black px-1 rounded">node api.cjs</code>
-              </p>
+              <div className="text-sm text-red-400 bg-red-900/20 p-3 rounded-lg border border-red-900/50">
+                <p className="font-bold mb-1">📡 Sem conexão com o Motor (Render)</p>
+                <p>O motor de mensagens no Render parece estar offline ou "dormindo".</p>
+                <ul className="list-disc list-inside mt-2 text-xs opacity-80">
+                  <li>Clique no botão "Ligar Automática" para tentar acordar o servidor.</li>
+                  <li>Aguarde até 1 minuto para o Render iniciar o serviço gratuito.</li>
+                  <li>Se persistir, verifique o status no painel do Render.</li>
+                </ul>
+              </div>
             )}
           </div>
         </Card>

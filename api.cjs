@@ -124,7 +124,7 @@ app.delete('/api/logout/:revendaId', async (req, res) => {
   return res.status(404).json({ error: "Não encontrado." });
 });
 
-const PORT = 3001; 
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 3001; 
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 MOTOR DE COBRANÇA ON (Porta ${PORT})`);
 });
