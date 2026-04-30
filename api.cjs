@@ -90,6 +90,7 @@ async function initClient(revendaId) {
   client.on('authenticated', () => {
     msgLog(revendaId, "Autenticado! Sincronizando dados (isso pode demorar no Render)...");
     sessions[revendaId].status = "AUTHENTICATED"; 
+    sessions[revendaId].qr = null; // LIMPA O QR AO AUTENTICAR PARA NÃO FICAR PRESO NA TELA
   });
 
   client.on('auth_failure', (msg) => {

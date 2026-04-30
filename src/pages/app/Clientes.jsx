@@ -32,6 +32,8 @@ export default function Clientes() {
   const [saving, setSaving] = useState(false)
   const [editing, setEditing] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [form, setForm] = useState({
     nome: '',
     whatsapp: '',
@@ -163,6 +165,70 @@ export default function Clientes() {
     else load()
   }
 
+  function downloadTemplate() {
+    const headers = "NOME;WHATSAPP;USUARIO;SENHA;PLANO;VALOR;VENCIMENTO;STATUS\n";
+    const example = "João Silva;5511999999999;joaoiptv;123456;Premium;35.00;2024-12-31;ativo\n";
+    const blob = new Blob([headers + example], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "modelo_importacao_clientes.csv");
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  async function handleImport(e) {
+    const file = e.target.files[0];
+    if (!file || !revendaId) return;
+
+    setImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target.result;
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      
+      // Ignora o cabeçalho se houver
+      const startIndex = lines[0].toLowerCase().includes('nome') ? 1 : 0;
+      const newClients = [];
+
+      for (let i = startIndex; i < lines.length; i++) {
+        const cols = lines[i].split(';'); // Usando ponto e vírgula como padrão Excel BR
+        if (cols.length < 1) continue;
+
+        const nome = (cols[0] || '').trim();
+        if (!nome) continue;
+
+        newClients.push({
+          revenda_id: revendaId,
+          nome: nome,
+          whatsapp: (cols[1] || '').trim() || null,
+          usuario: (cols[2] || '').trim() || null,
+          senha: (cols[3] || '').trim() || null,
+          plano: (cols[4] || '').trim() || null,
+          valor: isNaN(parseFloat(cols[5])) ? 0 : parseFloat(cols[5]),
+          vencimento: (cols[6] || '').trim() || null,
+          status: (cols[7] || '').trim() || 'ativo'
+        });
+      }
+
+      if (newClients.length > 0) {
+        const { error } = await supabase.from('clientes').insert(newClients);
+        if (error) alert("Erro ao importar: " + error.message);
+        else {
+          alert(`Sucesso! ${newClients.length} clientes importados.`);
+          load();
+          setImportModalOpen(false);
+        }
+      } else {
+        alert("Nenhum cliente válido encontrado no arquivo.");
+      }
+      setImporting(false);
+    };
+    reader.readAsText(file);
+  }
+
   const alerts = useMemo(() => {
     const out = []
     for (const c of list) {
@@ -259,13 +325,22 @@ export default function Clientes() {
             <option value="suspenso">Suspenso</option>
           </select>
         </div>
-        <button
-          type="button"
-          onClick={openNew}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
-        >
-          Novo cliente
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setImportModalOpen(true)}
+            className="rounded-lg border border-gray-700 bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-300 hover:bg-gray-800"
+          >
+            Importar
+          </button>
+          <button
+            type="button"
+            onClick={openNew}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+          >
+            Novo cliente
+          </button>
+        </div>
       </div>
 
       {modalOpen && (
@@ -347,6 +422,50 @@ export default function Clientes() {
               </button>
             </div>
           </form>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {importModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md">
+            <Card title="Importar Clientes">
+              <div className="space-y-4">
+                <p className="text-sm text-gray-400">
+                  Faça o upload de um arquivo CSV seguindo o modelo padrão. O arquivo deve usar ponto e vírgula (;) como separador.
+                </p>
+                <div className="rounded-lg border border-dashed border-gray-700 p-6 text-center">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImport}
+                    className="hidden"
+                    id="csv-upload"
+                    disabled={importing}
+                  />
+                  <label
+                    htmlFor="csv-upload"
+                    className="cursor-pointer text-indigo-400 hover:text-indigo-300"
+                  >
+                    {importing ? 'Processando...' : 'Clique para selecionar o arquivo .csv'}
+                  </label>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={downloadTemplate}
+                    className="text-xs text-gray-500 hover:text-white underline text-left"
+                  >
+                    Baixar planilha modelo (modelo_importacao.csv)
+                  </button>
+                  <button
+                    onClick={() => setImportModalOpen(false)}
+                    className="mt-4 w-full rounded-lg border border-gray-600 py-2 text-sm text-gray-300 hover:bg-gray-800"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
             </Card>
           </div>
         </div>
