@@ -49,10 +49,6 @@ async function initClient(revendaId) {
     authTimeoutMs: 300000, 
     qrMaxRetries: 10,
     takeoverOnConflict: true,
-    webVersionCache: {
-      type: 'remote',
-      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
-    },
     puppeteer: {
       headless: true,
       args: [
@@ -62,13 +58,10 @@ async function initClient(revendaId) {
         "--disable-gpu",
         "--no-first-run",
         "--no-zygote",
-        "--single-process",
         "--disable-extensions",
         "--disable-accelerated-2d-canvas",
         "--disable-session-crashed-bubble",
         "--disable-infobars",
-        "--disable-local-storage",
-        "--disable-component-update",
       ],
       executablePath: process.env.CHROME_PATH || null
     }
