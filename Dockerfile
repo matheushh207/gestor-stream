@@ -1,10 +1,11 @@
 FROM node:18-bullseye-slim
 
-# Instalar dependências necessárias para o Chromium rodar no servidor (Puppeteer)
+# Instalar dependências e o Chromium oficial do sistema
 RUN apt-get update && apt-get install -y \
-    gconf-service \
-    libgbm-dev \
+    chromium \
+    fonts-liberation \
     libasound2 \
+    libatk-bridge2.0-0 \
     libatk1.0-0 \
     libc6 \
     libcairo2 \
@@ -12,12 +13,12 @@ RUN apt-get update && apt-get install -y \
     libdbus-1-3 \
     libexpat1 \
     libfontconfig1 \
+    libgbm1 \
     libgcc1 \
-    libgconf-2-4 \
-    libgdk-pixbuf2.0-0 \
     libglib2.0-0 \
     libgtk-3-0 \
     libnspr4 \
+    libnss3 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libstdc++6 \
@@ -34,14 +35,14 @@ RUN apt-get update && apt-get install -y \
     libxrender1 \
     libxss1 \
     libxtst6 \
-    ca-certificates \
-    fonts-liberation \
-    libappindicator1 \
-    libnss3 \
     lsb-release \
-    xdg-utils \
     wget \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Variável para o Puppeteer não baixar o Chrome dele (usa o do sistema)
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 

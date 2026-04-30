@@ -63,7 +63,7 @@ async function initClient(revendaId) {
         "--disable-session-crashed-bubble",
         "--disable-infobars",
       ],
-      executablePath: process.env.CHROME_PATH || null
+      executablePath: '/usr/bin/chromium'
     }
   });
 
