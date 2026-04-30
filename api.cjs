@@ -46,6 +46,9 @@ async function initClient(revendaId) {
 
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: revendaId }),
+    authTimeoutMs: 300000, // Aumentado para 5 minutos para lidar com a lentidão do Render
+    qrMaxRetries: 10,
+    takeoverOnConflict: true,
     puppeteer: {
       headless: true,
       args: [
@@ -57,10 +60,11 @@ async function initClient(revendaId) {
         "--no-zygote",
         "--single-process",
         "--disable-extensions",
-        "--disable-setuid-sandbox",
         "--disable-accelerated-2d-canvas",
+        "--disable-session-crashed-bubble",
+        "--disable-infobars",
       ],
-      executablePath: process.env.CHROME_PATH || null // Útil para alguns ambientes Docker
+      executablePath: process.env.CHROME_PATH || null
     }
   });
 

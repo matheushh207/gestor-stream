@@ -257,10 +257,16 @@ export default function AppDashboard() {
                   zapStatus === 'CONNECTED' ? '✅ Conectado - Pronto para Automatizar!' :
                     zapStatus === 'QR_READY' ? '📷 Leia o QR Code abaixo com seu WhatsApp...' :
                       zapStatus === 'STARTING' ? '⏳ Iniciando servidor (pode levar até 1 minuto no Render)...' :
-                        zapStatus === 'AUTHENTICATED' ? '⌛ Autenticado! Sincronizando mensagens (aguarde)...' :
+                        zapStatus === 'AUTHENTICATED' ? '⌛ Autenticado! Sincronizando (isso pode levar 2-3 min no Render, aguarde)...' :
                           zapStatus === 'OFFLINE_API' ? '❌ API Desligada no Servidor.' : '⚠️ Desconectado'
                 }
               </span>
+
+              {zapStatus === 'AUTHENTICATED' && (
+                <span className="text-xs text-amber-400 animate-pulse">
+                  ⚠️ O WhatsApp está carregando suas mensagens. Não feche esta página.
+                </span>
+              )}
 
               {zapStatus !== 'CONNECTED' && zapStatus !== 'STARTING' && zapStatus !== 'QR_READY' && (
                 <button onClick={ligarZap} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500">
