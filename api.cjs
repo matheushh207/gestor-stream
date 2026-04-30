@@ -62,6 +62,7 @@ async function initClient(revendaId) {
         "--disable-accelerated-2d-canvas",
         "--disable-session-crashed-bubble",
         "--disable-infobars",
+        "--js-flags=\"--max-old-space-size=400\"", // Limita RAM do V8 no Chrome
       ],
       executablePath: '/usr/bin/chromium'
     }
@@ -132,8 +133,8 @@ async function resumeSessions() {
       const revendaId = dir.replace('session-', '');
       msgLog(revendaId, "Retomando sessão encontrada no disco...");
       initClient(revendaId).catch(() => {});
-      // Delay pequeno entre inicializações para não sobrecarregar CPU/RAM
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Delay maior entre inicializações para não sobrecarregar CPU/RAM no boot do Render
+      await new Promise(resolve => setTimeout(resolve, 15000));
     }
   }
 }
