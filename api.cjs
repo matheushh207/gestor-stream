@@ -100,8 +100,8 @@ async function initClient(revendaId) {
   });
 
   client.on('authenticated', () => {
-    msgLog(revendaId, "Autenticado! Sincronizando (economia de RAM ativa)...");
-    sessions[revendaId].status = "AUTHENTICATED"; 
+    msgLog(revendaId, "Autenticado! Liberando sistema imediatamente...");
+    sessions[revendaId].status = "CONNECTED"; // FORÇAMOS PARA CONNECTED PARA LIBERAR O USO
     sessions[revendaId].qr = null;
   });
 
