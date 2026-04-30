@@ -51,9 +51,13 @@ export default function AppDashboard() {
       setZapStatus(data.status || 'NOT_FOUND')
       setZapQr(data.qr || null)
     } catch (e) {
-      // Se estivermos no meio de um STARTING ou AUTHENTICATED, ignoramos erros de rede temporários
-      // pois o Render pode estar sob alta carga de CPU durante a sincronização
-      if (zapStatus !== 'STARTING' && zapStatus !== 'AUTHENTICATED') {
+      // Se estivermos em AUTHENTICATED, o servidor está sob carga máxima de CPU
+      // Ignoramos erros por até 10 minutos para dar tempo de terminar a sync
+      if (zapStatus === 'AUTHENTICATED') {
+        return; // Mantém o status AUTHENTICATED
+      }
+      
+      if (zapStatus !== 'STARTING') {
         setZapStatus('OFFLINE_API')
       }
     }

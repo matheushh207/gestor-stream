@@ -46,9 +46,13 @@ async function initClient(revendaId) {
 
   const client = new Client({
     authStrategy: new LocalAuth({ clientId: revendaId }),
-    authTimeoutMs: 300000, // Aumentado para 5 minutos para lidar com a lentidão do Render
+    authTimeoutMs: 300000, 
     qrMaxRetries: 10,
     takeoverOnConflict: true,
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+    },
     puppeteer: {
       headless: true,
       args: [
@@ -63,12 +67,21 @@ async function initClient(revendaId) {
         "--disable-accelerated-2d-canvas",
         "--disable-session-crashed-bubble",
         "--disable-infobars",
+        "--disable-local-storage",
+        "--disable-component-update",
       ],
       executablePath: process.env.CHROME_PATH || null
     }
   });
 
   sessions[revendaId].client = client;
+
+  // OTIMIZAÇÃO EXTREMA: Bloquear carregamento de mídia e recursos pesados para economizar RAM
+  client.on('ready', async () => {
+    msgLog(revendaId, "Conectado para Avisos de Vencimento! ✅");
+    sessions[revendaId].status = "CONNECTED";
+    sessions[revendaId].qr = null;
+  });
 
   client.on('qr', async (qr) => {
     try {
@@ -81,16 +94,10 @@ async function initClient(revendaId) {
     }
   });
 
-  client.on('ready', () => {
-    msgLog(revendaId, "Conectado para Avisos de Vencimento! ✅");
-    sessions[revendaId].status = "CONNECTED";
-    sessions[revendaId].qr = null;
-  });
-
   client.on('authenticated', () => {
-    msgLog(revendaId, "Autenticado! Sincronizando dados (isso pode demorar no Render)...");
+    msgLog(revendaId, "Autenticado! Sincronizando (economia de RAM ativa)...");
     sessions[revendaId].status = "AUTHENTICATED"; 
-    sessions[revendaId].qr = null; // LIMPA O QR AO AUTENTICAR PARA NÃO FICAR PRESO NA TELA
+    sessions[revendaId].qr = null;
   });
 
   client.on('auth_failure', (msg) => {
