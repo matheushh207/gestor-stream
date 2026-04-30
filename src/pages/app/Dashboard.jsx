@@ -46,24 +46,41 @@ export default function AppDashboard() {
     if (!revendaId) return
     try {
       const res = await fetch(`${API_URL}/status/${revendaId}`)
+      if (!res.ok) throw new Error("Server error");
       const data = await res.json()
       setZapStatus(data.status || 'NOT_FOUND')
       setZapQr(data.qr || null)
     } catch (e) {
-      setZapStatus('OFFLINE_API')
+      // Se estivermos no meio de um STARTING ou AUTHENTICATED, ignoramos erros de rede temporários
+      // pois o Render pode estar sob alta carga de CPU durante a sincronização
+      if (zapStatus !== 'STARTING' && zapStatus !== 'AUTHENTICATED') {
+        setZapStatus('OFFLINE_API')
+      }
     }
   }
 
   useEffect(() => {
     let interval;
-    if (zapStatus === 'STARTING' || zapStatus === 'QR_READY') {
+    if (zapStatus === 'STARTING' || zapStatus === 'QR_READY' || zapStatus === 'AUTHENTICATED') {
       interval = setInterval(checkZap, 3000)
     }
     return () => clearInterval(interval)
   }, [zapStatus, revendaId])
 
   useEffect(() => {
-    loadZapAndClients()
+    // Keep-alive: ping o servidor a cada 10 minutos para evitar que o Render durma enquanto o dashboard estiver aberto
+    const keepAlive = setInterval(() => {
+      fetch(`${API_URL}/ping`).catch(() => {});
+    }, 10 * 60 * 1000); 
+    return () => clearInterval(keepAlive);
+  }, []);
+
+  useEffect(() => {
+    if (revendaId) {
+      // Tenta acordar o servidor assim que o dashboard carrega
+      fetch(`${API_URL}/ping`).catch(() => {});
+      loadZapAndClients()
+    }
   }, [revendaId])
 
   async function loadZapAndClients() {
@@ -239,8 +256,9 @@ export default function AppDashboard() {
                 Status ZAP: {
                   zapStatus === 'CONNECTED' ? '✅ Conectado - Pronto para Automatizar!' :
                     zapStatus === 'QR_READY' ? '📷 Leia o QR Code abaixo com seu WhatsApp...' :
-                      zapStatus === 'STARTING' ? '⏳ Iniciando servidor Chrome...' :
-                        zapStatus === 'OFFLINE_API' ? '❌ API Desligada no Servidor.' : '⚠️ Desconectado'
+                      zapStatus === 'STARTING' ? '⏳ Iniciando servidor (pode levar até 1 minuto no Render)...' :
+                        zapStatus === 'AUTHENTICATED' ? '⌛ Autenticado! Sincronizando mensagens (aguarde)...' :
+                          zapStatus === 'OFFLINE_API' ? '❌ API Desligada no Servidor.' : '⚠️ Desconectado'
                 }
               </span>
 

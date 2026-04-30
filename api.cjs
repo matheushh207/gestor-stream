@@ -18,17 +18,22 @@ app.use((req, res, next) => {
 });
 
 // Banco de dados em memória para as seções
+const fs = require('fs');
+const path = require('path');
+
+// Banco de dados em memória para as seções
 const sessions = {};
 
 function msgLog(revendaId, msg) {
   console.log(`[BILLING-REV-${revendaId}] -> ${msg}`);
 }
 
-app.post('/api/start/:revendaId', async (req, res) => {
-  const { revendaId } = req.params;
-
-  if (sessions[revendaId]) {
-    return res.status(400).json({ error: "Sessão já existe ou está rodando." });
+/**
+ * Inicializa um cliente WhatsApp para uma revenda específica
+ */
+async function initClient(revendaId) {
+  if (sessions[revendaId] && (sessions[revendaId].status === "STARTING" || sessions[revendaId].status === "CONNECTED" || sessions[revendaId].status === "QR_READY")) {
+    return sessions[revendaId];
   }
 
   msgLog(revendaId, "Inicializando motor de COBRANÇA...");
@@ -43,7 +48,19 @@ app.post('/api/start/:revendaId', async (req, res) => {
     authStrategy: new LocalAuth({ clientId: revendaId }),
     puppeteer: {
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      args: [
+        "--no-sandbox", 
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process",
+        "--disable-extensions",
+        "--disable-setuid-sandbox",
+        "--disable-accelerated-2d-canvas",
+      ],
+      executablePath: process.env.CHROME_PATH || null // Útil para alguns ambientes Docker
     }
   });
 
@@ -54,7 +71,10 @@ app.post('/api/start/:revendaId', async (req, res) => {
       const qrBase64 = await qrcode.toDataURL(qr);
       sessions[revendaId].qr = qrBase64;
       sessions[revendaId].status = "QR_READY";
-    } catch(e) { }
+      msgLog(revendaId, "QR Code gerado. Aguardando leitura...");
+    } catch(e) { 
+      msgLog(revendaId, "Erro ao gerar QR Code: " + e.message);
+    }
   });
 
   client.on('ready', () => {
@@ -63,14 +83,64 @@ app.post('/api/start/:revendaId', async (req, res) => {
     sessions[revendaId].qr = null;
   });
 
+  client.on('authenticated', () => {
+    msgLog(revendaId, "Autenticado! Sincronizando dados (isso pode demorar no Render)...");
+    sessions[revendaId].status = "AUTHENTICATED"; 
+  });
+
+  client.on('auth_failure', (msg) => {
+    msgLog(revendaId, "Falha na autenticação: " + msg);
+    sessions[revendaId].status = "DISCONNECTED";
+    delete sessions[revendaId];
+  });
+
   client.on('disconnected', (reason) => {
     msgLog(revendaId, `Desconectado: ${reason}`);
     sessions[revendaId].status = "DISCONNECTED";
     sessions[revendaId].qr = null;
+    delete sessions[revendaId];
   });
 
-  client.initialize();
+  // Tenta inicializar. Se falhar, limpa o estado.
+  try {
+    client.initialize().catch(err => {
+        msgLog(revendaId, "Erro na inicialização: " + err.message);
+        sessions[revendaId].status = "OFFLINE_API";
+    });
+  } catch(e) {
+    msgLog(revendaId, "Erro crítico no initialize: " + e.message);
+  }
+
+  return sessions[revendaId];
+}
+
+/**
+ * Tenta retomar sessões existentes no disco ao iniciar o servidor
+ */
+async function resumeSessions() {
+  const authDir = path.join(process.cwd(), '.wwebjs_auth');
+  if (fs.existsSync(authDir)) {
+    const files = fs.readdirSync(authDir);
+    const sessionDirs = files.filter(f => f.startsWith('session-'));
+    
+    for (const dir of sessionDirs) {
+      const revendaId = dir.replace('session-', '');
+      msgLog(revendaId, "Retomando sessão encontrada no disco...");
+      initClient(revendaId).catch(() => {});
+      // Delay pequeno entre inicializações para não sobrecarregar CPU/RAM
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+}
+
+app.post('/api/start/:revendaId', async (req, res) => {
+  const { revendaId } = req.params;
+  await initClient(revendaId);
   return res.json({ message: "Iniciando motor de avisos...", revendaId });
+});
+
+app.get('/api/ping', (req, res) => {
+  res.json({ status: "online", timestamp: new Date().toISOString() });
 });
 
 app.get('/api/status/:revendaId', (req, res) => {
@@ -127,4 +197,6 @@ app.delete('/api/logout/:revendaId', async (req, res) => {
 const PORT = process.env.PORT || 3001; 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 MOTOR DE COBRANÇA ON (Porta ${PORT})`);
+    // Inicia a retomada automática de sessões
+    resumeSessions();
 });
