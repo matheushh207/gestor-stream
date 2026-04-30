@@ -8,6 +8,10 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const app = express();
 app.use(express.json());
 
+// LIMITE RADICAL DE MEMÓRIA PARA O NODE.JS (SOBRA MAIS PARA O CHROME)
+const v8 = require('v8');
+v8.setFlagsFromString('--max-old-space-size=128');
+
 // CORS Manual
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -62,7 +66,14 @@ async function initClient(revendaId) {
         "--disable-accelerated-2d-canvas",
         "--disable-session-crashed-bubble",
         "--disable-infobars",
-        "--js-flags=\"--max-old-space-size=400\"", // Limita RAM do V8 no Chrome
+        "--js-flags=\"--max-old-space-size=300\"", // Reduzi para 300MB para dar margem
+        "--disk-cache-size=1",
+        "--media-cache-size=1",
+        "--disable-webgl",
+        "--disable-threaded-animation",
+        "--disable-threaded-scrolling",
+        "--disable-software-rasterizer",
+        "--disable-remote-fonts",
       ],
       executablePath: '/usr/bin/chromium'
     }
