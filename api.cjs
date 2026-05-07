@@ -10,7 +10,7 @@ app.use(express.json());
 
 // LIMITE RADICAL DE MEMÓRIA PARA O NODE.JS (SOBRA MAIS PARA O CHROME)
 const v8 = require('v8');
-v8.setFlagsFromString('--max-old-space-size=128');
+v8.setFlagsFromString('--max-old-space-size=512');
 
 // CORS Manual
 app.use((req, res, next) => {
@@ -75,7 +75,7 @@ async function initClient(revendaId) {
         "--disable-software-rasterizer",
         "--disable-remote-fonts",
       ],
-      executablePath: '/usr/bin/chromium'
+      executablePath: process.platform === 'linux' ? '/usr/bin/chromium' : undefined
     }
   });
 

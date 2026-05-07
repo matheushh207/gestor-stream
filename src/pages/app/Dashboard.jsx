@@ -97,7 +97,7 @@ export default function AppDashboard() {
     try {
       await fetch(`${API_URL}/start/${revendaId}`, { method: 'POST' })
     } catch (e) {
-      alert("Não foi possível alcançar o motor no Render. Ele pode estar iniciando ou o endereço está incorreto.")
+      alert("Não foi possível alcançar o motor local. Verifique se o terminal está aberto.")
       setZapStatus('OFFLINE_API')
     }
   }
@@ -250,7 +250,7 @@ export default function AppDashboard() {
 
       {/* NOVO: CARDBOX DE WHATSAPP API */}
       <div className="mb-6">
-        <Card title="Motor Automático do WhatsApp (SaaS)">
+        <Card title="Motor Automático do WhatsApp (Local)">
           <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-4 border-b border-gray-800 pb-4">
               <span className={`px-3 py-1 rounded text-sm font-semibold ${zapStatus === 'CONNECTED' ? 'bg-emerald-900/50 text-emerald-400' :
@@ -260,8 +260,8 @@ export default function AppDashboard() {
                 Status ZAP: {
                   zapStatus === 'CONNECTED' ? '✅ Conectado - Pronto para Automatizar!' :
                     zapStatus === 'QR_READY' ? '📷 Leia o QR Code abaixo com seu WhatsApp...' :
-                      zapStatus === 'STARTING' ? '⏳ Iniciando servidor (pode levar até 1 minuto no Render)...' :
-                        zapStatus === 'AUTHENTICATED' ? '⌛ Autenticado! Sincronizando (isso pode levar 2-3 min no Render, aguarde)...' :
+                      zapStatus === 'STARTING' ? '⏳ Iniciando motor local...' :
+                        zapStatus === 'AUTHENTICATED' ? '⌛ Autenticado! Sincronizando mensagens, aguarde...' :
                           zapStatus === 'OFFLINE_API' ? '❌ API Desligada no Servidor.' : '⚠️ Desconectado'
                 }
               </span>
@@ -293,12 +293,11 @@ export default function AppDashboard() {
 
             {zapStatus === 'OFFLINE_API' && (
               <div className="text-sm text-red-400 bg-red-900/20 p-3 rounded-lg border border-red-900/50">
-                <p className="font-bold mb-1">📡 Sem conexão com o Motor (Render)</p>
-                <p>O motor de mensagens no Render parece estar offline ou "dormindo".</p>
+                <p className="font-bold mb-1">📡 Sem conexão com o Motor Local</p>
+                <p>O motor de mensagens não foi detectado.</p>
                 <ul className="list-disc list-inside mt-2 text-xs opacity-80">
-                  <li>Clique no botão "Ligar Automática" para tentar acordar o servidor.</li>
-                  <li>Aguarde até 1 minuto para o Render iniciar o serviço gratuito.</li>
-                  <li>Se persistir, verifique o status no painel do Render.</li>
+                  <li>Certifique-se de que o arquivo "INICIAR_MOTOR.bat" na área de trabalho foi executado.</li>
+                  <li>Verifique se o terminal do motor está aberto e sem erros.</li>
                 </ul>
               </div>
             )}
