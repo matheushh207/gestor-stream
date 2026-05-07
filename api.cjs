@@ -8,15 +8,22 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const app = express();
 app.use(express.json());
 
-// LIMITE RADICAL DE MEMÓRIA PARA O NODE.JS (SOBRA MAIS PARA O CHROME)
+// Sensor de Chamadas (Para diagnóstico)
+app.use((req, res, next) => {
+  console.log(`[API-LOG] Recebida chamada: ${req.method} ${req.url}`);
+  next();
+});
+
+// Configuração de Memória (Padrão local)
 const v8 = require('v8');
-v8.setFlagsFromString('--max-old-space-size=512');
+v8.setFlagsFromString('--max-old-space-size=1024'); // Aumentado para 1GB para rodar liso no PC
 
 // CORS Manual
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Private-Network", "true"); // ESSENCIAL PARA O CHROME NOVO
   if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
 });
@@ -145,8 +152,8 @@ async function resumeSessions() {
       const revendaId = dir.replace('session-', '');
       msgLog(revendaId, "Retomando sessão encontrada no disco...");
       initClient(revendaId).catch(() => {});
-      // Delay maior entre inicializações para não sobrecarregar CPU/RAM no boot do Render
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      // Delay curto para local
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
 }
