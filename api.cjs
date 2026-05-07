@@ -55,6 +55,7 @@ async function initClient(revendaId) {
     takeoverOnConflict: true,
     puppeteer: {
       headless: true,
+      protocolTimeout: 60000,
       args: [
         "--no-sandbox", 
         "--disable-setuid-sandbox",
@@ -66,7 +67,7 @@ async function initClient(revendaId) {
         "--disable-accelerated-2d-canvas",
         "--disable-session-crashed-bubble",
         "--disable-infobars",
-        "--js-flags=\"--max-old-space-size=300\"", // Reduzi para 300MB para dar margem
+        "--js-flags=\"--max-old-space-size=512\"", 
         "--disk-cache-size=1",
         "--media-cache-size=1",
         "--disable-webgl",
