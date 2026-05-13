@@ -16,7 +16,8 @@ const statusColors = {
   suspenso: 'bg-gray-500/20 text-gray-300',
 }
 
-function rowAlertClass(vencimento) {
+function rowAlertClass(vencimento, status) {
+  if (status === 'suspenso') return ''
   const a = alertaVencimento(vencimento)
   if (a === 'vencido') return 'border-l-4 border-red-500'
   if (a === 'proximo') return 'border-l-4 border-amber-500'
@@ -232,6 +233,7 @@ export default function Clientes() {
   const alerts = useMemo(() => {
     const out = []
     for (const c of list) {
+      if (c.status === 'suspenso') continue
       const a = alertaVencimento(c.vencimento)
       if (a === 'vencido')
         out.push({ id: c.id, nome: c.nome, tipo: 'vencido' })
@@ -494,7 +496,7 @@ export default function Clientes() {
                     return (
                       <tr
                         key={c.id}
-                        className={`border-b border-gray-800 transition-colors hover:bg-gray-800/40 ${rowAlertClass(c.vencimento)}`}
+                        className={`border-b border-gray-800 transition-colors hover:bg-gray-800/40 ${rowAlertClass(c.vencimento, c.status)}`}
                       >
                         <td className="py-3 pr-2 font-medium text-white">{c.nome}</td>
                         <td className="py-3 pr-2 text-gray-400 whitespace-nowrap">

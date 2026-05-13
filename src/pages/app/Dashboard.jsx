@@ -167,7 +167,8 @@ export default function AppDashboard() {
 
     const warn = []
     for (const c of list) {
-      const derived = statusFromVencimento(c.vencimento, c.status)
+      if (c.status === 'suspenso') continue
+
       const a = alertaVencimento(c.vencimento)
       if (a === 'vencido')
         warn.push({ cliente: c.nome, tipo: 'vencido', dias: -1, id: c.id, telefone: c.whatsapp })
