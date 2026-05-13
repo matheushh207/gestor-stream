@@ -11,6 +11,7 @@ export default function Financeiro() {
   const [pagamentos, setPagamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [filtroCliente, setFiltroCliente] = useState('')
+  const [buscaNome, setBuscaNome] = useState('')
   const [form, setForm] = useState({
     cliente_id: '',
     valor: '',
@@ -58,12 +59,24 @@ export default function Financeiro() {
   }, [clientes])
 
   const filtered = useMemo(() => {
-    if (!filtroCliente) return pagamentos
-    return pagamentos.filter((p) => p.cliente_id === filtroCliente)
-  }, [pagamentos, filtroCliente])
+    return pagamentos.filter((p) => {
+      const matchCliente = !filtroCliente || p.cliente_id === filtroCliente
+      const nome = (nomeById[p.cliente_id] || '').toLowerCase()
+      const matchBusca = !buscaNome || nome.includes(buscaNome.toLowerCase())
+      return matchCliente && matchBusca
+    })
+  }, [pagamentos, filtroCliente, buscaNome, nomeById])
 
-  const totalRecebido = useMemo(() => {
-    return filtered.reduce((s, p) => s + Number(p.valor || 0), 0)
+  const totais = useMemo(() => {
+    const res = { total: 0, pix: 0, dinheiro: 0, cartao: 0 }
+    for (const p of filtered) {
+      const val = Number(p.valor || 0)
+      res.total += val
+      if (p.metodo === 'pix') res.pix += val
+      else if (p.metodo === 'dinheiro') res.dinheiro += val
+      else if (p.metodo === 'cartao') res.cartao += val
+    }
+    return res
   }, [filtered])
 
   function handleSelectCliente(id) {
@@ -179,10 +192,25 @@ export default function Financeiro() {
       />
 
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
-        <Card title="Total recebido (filtro atual)">
-          <p className="text-3xl font-bold text-emerald-400">
-            R$ {totalRecebido.toFixed(2)}
-          </p>
+        <Card title="Resumo Financeiro (Filtro)">
+          <div className="space-y-2">
+            <div className="flex justify-between border-b border-gray-800 pb-1">
+              <span className="text-gray-400">PIX</span>
+              <span className="font-medium text-white">R$ {totais.pix.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-800 pb-1">
+              <span className="text-gray-400">Dinheiro</span>
+              <span className="font-medium text-white">R$ {totais.dinheiro.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between border-b border-gray-800 pb-1">
+              <span className="text-gray-400">Cartão</span>
+              <span className="font-medium text-white">R$ {totais.cartao.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between pt-1">
+              <span className="font-bold text-gray-200">Total</span>
+              <span className="text-xl font-bold text-emerald-400">R$ {totais.total.toFixed(2)}</span>
+            </div>
+          </div>
         </Card>
         <div className="lg:col-span-2">
           <Card title="Registrar pagamento e Renovação">
@@ -246,20 +274,31 @@ export default function Financeiro() {
       </div>
 
       <Card title="Histórico de Pagamentos">
-        <div className="mb-4 flex flex-wrap items-center gap-4">
-          <label className="text-sm text-gray-400">Filtrar por cliente</label>
-          <select
-            value={filtroCliente}
-            onChange={(e) => setFiltroCliente(e.target.value)}
-            className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
-          >
-            <option value="">Todos</option>
-            {clientes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nome}
-              </option>
-            ))}
-          </select>
+        <div className="mb-4 flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[200px]">
+            <label className="mb-1 block text-xs text-gray-500">Buscar por nome</label>
+            <input
+              value={buscaNome}
+              onChange={(e) => setBuscaNome(e.target.value)}
+              placeholder="Nome do cliente..."
+              className="w-full rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">Filtrar por cliente</label>
+            <select
+              value={filtroCliente}
+              onChange={(e) => setFiltroCliente(e.target.value)}
+              className="rounded-lg border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+            >
+              <option value="">Todos</option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         {loading ? (
           <p className="text-gray-400">Carregando…</p>
