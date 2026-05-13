@@ -257,6 +257,8 @@ export default function Clientes() {
       badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-red-500/20 text-red-400">Vencido</span>;
     } else if (dias === 0) {
       badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-400">Hj</span>;
+    } else if (dias === 1) {
+      badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-400">1 dia</span>;
     } else if (dias <= 3) {
       badge = <span className="ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-500/20 text-amber-400">{dias} dias</span>;
     } else {

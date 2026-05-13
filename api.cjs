@@ -4,6 +4,8 @@
 const express = require('express');
 const qrcode = require('qrcode');
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
@@ -14,26 +16,22 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configuração de Memória (Padrão local)
+// Configuração de Memória
 const v8 = require('v8');
-v8.setFlagsFromString('--max-old-space-size=1024'); // Aumentado para 1GB para rodar liso no PC
+v8.setFlagsFromString('--max-old-space-size=1024'); 
 
 // CORS Manual
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Private-Network", "true"); // ESSENCIAL PARA O CHROME NOVO
+  res.header("Access-Control-Allow-Private-Network", "true"); 
   if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
 });
 
-// Banco de dados em memória para as seções
-const fs = require('fs');
-const path = require('path');
-
-// Banco de dados em memória para as seções
 const sessions = {};
+const initializing = new Set(); 
 
 function msgLog(revendaId, msg) {
   console.log(`[BILLING-REV-${revendaId}] -> ${msg}`);
@@ -43,159 +41,113 @@ function msgLog(revendaId, msg) {
  * Inicializa um cliente WhatsApp para uma revenda específica
  */
 async function initClient(revendaId) {
-  if (sessions[revendaId] && (sessions[revendaId].status === "STARTING" || sessions[revendaId].status === "CONNECTED" || sessions[revendaId].status === "QR_READY")) {
-    return sessions[revendaId];
+  // CHECAGEM SÍNCRONA E IMEDIATA DO CADEADO
+  if (initializing.has(revendaId)) {
+    return; // Já está tentando abrir, não faz nada
   }
 
-  msgLog(revendaId, "Inicializando motor de COBRANÇA...");
+  if (sessions[revendaId] && (sessions[revendaId].status === "CONNECTED" || sessions[revendaId].status === "QR_READY" || sessions[revendaId].status === "STARTING")) {
+    return;
+  }
+
+  // FECHA O CADEADO ANTES DE QUALQUER AWAIT
+  initializing.add(revendaId);
+  sessions[revendaId] = { status: "STARTING", qr: null };
   
-  sessions[revendaId] = {
-    client: null,
-    qr: null,
-    status: "STARTING"
-  };
+  msgLog(revendaId, "Abrindo navegador... Aguarde.");
 
-  const client = new Client({
-    authStrategy: new LocalAuth({ clientId: revendaId }),
-    authTimeoutMs: 300000, 
-    qrMaxRetries: 10,
-    takeoverOnConflict: true,
-    puppeteer: {
-      headless: true,
-      protocolTimeout: 60000,
-      args: [
-        "--no-sandbox", 
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-zygote",
-        "--disable-extensions",
-        "--disable-accelerated-2d-canvas",
-        "--disable-session-crashed-bubble",
-        "--disable-infobars",
-        "--js-flags=\"--max-old-space-size=512\"", 
-        "--disk-cache-size=1",
-        "--media-cache-size=1",
-        "--disable-webgl",
-        "--disable-threaded-animation",
-        "--disable-threaded-scrolling",
-        "--disable-software-rasterizer",
-        "--disable-remote-fonts",
-      ],
-      executablePath: process.platform === 'linux' ? '/usr/bin/chromium' : undefined
-    }
-  });
-
-  sessions[revendaId].client = client;
-
-  // OTIMIZAÇÃO EXTREMA: Bloquear carregamento de mídia e recursos pesados para economizar RAM
-  client.on('ready', async () => {
-    msgLog(revendaId, "Conectado para Avisos de Vencimento! ✅");
-    sessions[revendaId].status = "CONNECTED";
-    sessions[revendaId].qr = null;
-  });
-
-  client.on('qr', async (qr) => {
-    try {
-      const qrBase64 = await qrcode.toDataURL(qr);
-      sessions[revendaId].qr = qrBase64;
-      sessions[revendaId].status = "QR_READY";
-      msgLog(revendaId, "QR Code gerado. Aguardando leitura...");
-    } catch(e) { 
-      msgLog(revendaId, "Erro ao gerar QR Code: " + e.message);
-    }
-  });
-
-  client.on('authenticated', () => {
-    msgLog(revendaId, "Autenticado! Liberando sistema imediatamente...");
-    sessions[revendaId].status = "CONNECTED"; // FORÇAMOS PARA CONNECTED PARA LIBERAR O USO
-    sessions[revendaId].qr = null;
-  });
-
-  client.on('auth_failure', (msg) => {
-    msgLog(revendaId, "Falha na autenticação: " + msg);
-    sessions[revendaId].status = "DISCONNECTED";
-    delete sessions[revendaId];
-  });
-
-  client.on('disconnected', (reason) => {
-    msgLog(revendaId, `Desconectado: ${reason}`);
-    sessions[revendaId].status = "DISCONNECTED";
-    sessions[revendaId].qr = null;
-    delete sessions[revendaId];
-  });
-
-  // Tenta inicializar. Se falhar, limpa o estado.
   try {
-    client.initialize().catch(err => {
-        msgLog(revendaId, "Erro na inicialização: " + err.message);
-        sessions[revendaId].status = "OFFLINE_API";
+    const client = new Client({
+      authStrategy: new LocalAuth({ 
+        clientId: revendaId,
+        dataPath: path.join(__dirname, '.wwebjs_auth')
+      }),
+      puppeteer: {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu'
+        ],
+        protocolTimeout: 60000,
+      }
     });
-  } catch(e) {
-    msgLog(revendaId, "Erro crítico no initialize: " + e.message);
-  }
 
-  return sessions[revendaId];
+    client.on('qr', async (qr) => {
+      try {
+        const qrBase64 = await qrcode.toDataURL(qr);
+        sessions[revendaId].qr = qrBase64;
+        sessions[revendaId].status = "QR_READY";
+        msgLog(revendaId, "QR Code pronto!");
+        initializing.delete(revendaId);
+      } catch (e) {
+        msgLog(revendaId, "Erro no QR: " + e.message);
+      }
+    });
+
+    client.on('ready', () => {
+      msgLog(revendaId, "WhatsApp Conectado! ✅");
+      sessions[revendaId].status = "CONNECTED";
+      sessions[revendaId].qr = null;
+      initializing.delete(revendaId);
+    });
+
+    client.on('auth_failure', () => {
+      msgLog(revendaId, "Falha na autenticação.");
+      delete sessions[revendaId];
+      initializing.delete(revendaId);
+    });
+
+    client.on('disconnected', () => {
+      msgLog(revendaId, "Desconectado.");
+      delete sessions[revendaId];
+      initializing.delete(revendaId);
+    });
+
+    await client.initialize();
+    sessions[revendaId].client = client;
+
+  } catch (err) {
+    msgLog(revendaId, "Erro ao abrir navegador: " + err.message);
+    delete sessions[revendaId];
+    initializing.delete(revendaId);
+  }
 }
 
-/**
- * Tenta retomar sessões existentes no disco ao iniciar o servidor
- */
-async function resumeSessions() {
-  const authDir = path.join(process.cwd(), '.wwebjs_auth');
-  if (fs.existsSync(authDir)) {
-    const files = fs.readdirSync(authDir);
-    const sessionDirs = files.filter(f => f.startsWith('session-'));
-    
-    for (const dir of sessionDirs) {
-      const revendaId = dir.replace('session-', '');
-      msgLog(revendaId, "Retomando sessão encontrada no disco...");
-      initClient(revendaId).catch(() => {});
-      // Delay curto para local
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  }
-}
+// --- ENDPOINTS ---
 
-app.post('/api/start/:revendaId', async (req, res) => {
+app.post('/api/start/:revendaId', (req, res) => {
   const { revendaId } = req.params;
-  await initClient(revendaId);
-  return res.json({ message: "Iniciando motor de avisos...", revendaId });
+  initClient(revendaId); 
+  return res.json({ message: "Iniciando...", revendaId });
 });
 
 app.get('/api/ping', (req, res) => {
-  res.json({ status: "online", timestamp: new Date().toISOString() });
+  res.json({ status: "online" });
 });
 
 app.get('/api/status/:revendaId', (req, res) => {
   const { revendaId } = req.params;
   const session = sessions[revendaId];
-  if (!session) return res.json({ status: "NOT_FOUND", qr: null });
+  if (!session) return res.json({ status: "OFFLINE_API", qr: null });
   return res.json({ status: session.status, qr: session.qr });
 });
 
 app.post('/api/send/:revendaId', async (req, res) => {
   const { revendaId } = req.params;
   const session = sessions[revendaId];
-
-  if (!session || session.status !== "CONNECTED") {
-    return res.status(400).json({ error: "WhatsApp não está conectado." });
-  }
-
+  if (!session || session.status !== "CONNECTED") return res.status(400).json({ error: "Desconectado" });
+  
   const { numero, texto } = req.body;
-  if (!numero || !texto) return res.status(400).json({ error: "Número e texto são obrigatórios." });
-
   try {
     let cleanNumber = String(numero).replace(/\D/g, '');
-    if (!cleanNumber.startsWith('55') && cleanNumber.length >= 10) {
-      cleanNumber = '55' + cleanNumber;
-    }
+    if (!cleanNumber.startsWith('55')) cleanNumber = '55' + cleanNumber;
     const numberId = await session.client.getNumberId(cleanNumber);
-    if (!numberId) return res.status(400).json({ error: "Número não existe no WhatsApp." });
-    
+    if (!numberId) return res.status(400).json({ error: "Número inválido" });
     await session.client.sendMessage(numberId._serialized, texto);
-    msgLog(revendaId, `Aviso de vencimento enviado para ${cleanNumber}`);
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ error: err.message });
@@ -206,22 +158,14 @@ app.delete('/api/logout/:revendaId', async (req, res) => {
   const { revendaId } = req.params;
   const session = sessions[revendaId];
   if (session && session.client) {
-    try {
-      await session.client.logout();
-      await session.client.destroy();
-      delete sessions[revendaId];
-      return res.json({ message: "Deslogado." });
-    } catch(e) {
-      delete sessions[revendaId];
-      return res.sendStatus(200);
-    }
+    await session.client.logout().catch(() => {});
+    await session.client.destroy().catch(() => {});
+    delete sessions[revendaId];
   }
-  return res.status(404).json({ error: "Não encontrado." });
+  return res.sendStatus(200);
 });
 
-const PORT = process.env.PORT || 3001; 
+const PORT = 3001; 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 MOTOR DE COBRANÇA ON (Porta ${PORT})`);
-    // Inicia a retomada automática de sessões
-    resumeSessions();
 });

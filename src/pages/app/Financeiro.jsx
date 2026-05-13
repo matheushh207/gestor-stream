@@ -16,7 +16,11 @@ export default function Financeiro() {
     valor: '',
     metodo: 'pix',
     duracao: '1',
-    pago_em: new Date().toISOString().slice(0, 16),
+    pago_em: (() => {
+      const now = new Date();
+      const offset = now.getTimezoneOffset() * 60000;
+      return (new Date(now - offset)).toISOString().slice(0, 16);
+    })(),
   })
   const [saving, setSaving] = useState(false)
 
@@ -123,7 +127,11 @@ export default function Financeiro() {
         valor: '',
         metodo: 'pix',
         duracao: '1',
-        pago_em: new Date().toISOString().slice(0, 16),
+        pago_em: (() => {
+          const now = new Date();
+          const offset = now.getTimezoneOffset() * 60000;
+          return (new Date(now - offset)).toISOString().slice(0, 16);
+        })(),
       })
       load()
     }

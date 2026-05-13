@@ -1,26 +1,35 @@
 /** Status derivado do vencimento (UI + persistência opcional). */
 export function statusFromVencimento(vencimento, statusManual) {
   if (!vencimento) return statusManual || 'teste'
-  const d = new Date(vencimento)
-  if (Number.isNaN(d.getTime())) return statusManual || 'teste'
+  
+  // Parse manually to avoid UTC shift
+  const [year, month, day] = vencimento.split('-').map(Number)
+  const v = new Date(year, month - 1, day)
+  if (Number.isNaN(v.getTime())) return statusManual || 'teste'
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const v = new Date(d)
   v.setHours(0, 0, 0, 0)
+
+  if (statusManual === 'suspenso') return 'suspenso'
   if (v < today) return 'vencido'
-  if (statusManual === 'suspenso' || statusManual === 'teste') return statusManual
-  return 'ativo'
+  return statusManual || 'ativo'
 }
 
 export function diasAteVencimento(vencimento) {
   if (!vencimento) return null
-  const d = new Date(vencimento)
-  if (Number.isNaN(d.getTime())) return null
+  
+  const [year, month, day] = vencimento.split('-').map(Number)
+  const v = new Date(year, month - 1, day)
+  if (Number.isNaN(v.getTime())) return null
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const v = new Date(d)
   v.setHours(0, 0, 0, 0)
-  return Math.ceil((v - today) / (1000 * 60 * 60 * 24))
+
+  const diffTime = v - today
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays
 }
 
 export function alertaVencimento(vencimento) {
@@ -34,7 +43,8 @@ export function alertaVencimento(vencimento) {
 export function calcularNovaDataVencimento(dataAtual, meses) {
   let base = new Date()
   if (dataAtual) {
-    const d = new Date(dataAtual)
+    const [year, month, day] = dataAtual.split('-').map(Number)
+    const d = new Date(year, month - 1, day)
     if (!Number.isNaN(d.getTime())) {
       base = d
     }
@@ -44,6 +54,9 @@ export function calcularNovaDataVencimento(dataAtual, meses) {
   // Adiciona os meses
   nova.setMonth(nova.getMonth() + meses)
 
-  // Formato YYYY-MM-DD para o input type="date"
-  return nova.toISOString().split('T')[0]
+  // Retorna formato YYYY-MM-DD local
+  const y = nova.getFullYear()
+  const m = String(nova.getMonth() + 1).padStart(2, '0')
+  const d = String(nova.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }

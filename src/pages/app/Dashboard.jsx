@@ -316,7 +316,7 @@ export default function AppDashboard() {
                 <div className="text-sm text-amber-100/90 flex flex-col sm:flex-row sm:items-center sm:gap-2">
                   <strong className="text-white text-base">{a.cliente}</strong>
                   <span className={`px-2 py-0.5 rounded text-xs font-semibold ${a.tipo === 'vencido' ? 'bg-red-500/20 text-red-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                    {a.tipo === 'vencido' ? 'Já Vencido' : a.dias === 0 ? 'Vence Hoje' : `Vence em ${a.dias} dias`}
+                    {a.tipo === 'vencido' ? 'Já Vencido' : a.dias === 0 ? 'Vence Hoje' : a.dias === 1 ? 'Vence Amanhã' : `Vence em ${a.dias} dias`}
                   </span>
                   <span className="text-xs text-gray-500">Telefone: {a.telefone || 'Falta Cadastro'}</span>
                 </div>
